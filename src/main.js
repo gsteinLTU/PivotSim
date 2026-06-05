@@ -43,6 +43,15 @@ const panel = createConfigPanel(configContainer, { ...DEFAULTS }, (params) => {
   rebuildStairwell(params);
 });
 
+panel.onCeilingToggle((visible) => {
+  if (!currentStairwell) return;
+  currentStairwell.traverse((child) => {
+    if (child.material && child.material.opacity < 0.5) {
+      child.visible = visible;
+    }
+  });
+});
+
 // Initial build
 rebuildStairwell(panel.getParams());
 

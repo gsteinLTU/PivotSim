@@ -65,4 +65,29 @@ describe('buildStairwell', () => {
     const treadWidth = Math.max(...xs) - Math.min(...xs);
     expect(treadWidth).toBeCloseTo(1.5, 5);
   });
+
+  it('omits ceiling quad when slopedCeiling is false', () => {
+    const params = { ...DEFAULTS, slopedCeiling: false };
+    const result = buildStairwell(params);
+    const stairCeilings = result.collisionQuads.filter(
+      (q) => q.type === 'ceiling'
+    );
+    // Only hallway ceilings, no stair ceiling
+    const hallwayCeilings = stairCeilings.length;
+    const paramsWithCeiling = { ...DEFAULTS, slopedCeiling: true };
+    const resultWith = buildStairwell(paramsWithCeiling);
+    const allCeilings = resultWith.collisionQuads.filter((q) => q.type === 'ceiling').length;
+    expect(hallwayCeilings).toBeLessThan(allCeilings);
+  });
+
+  it('hallway collision quads are correctly rotated for 90° turn', () => {
+    const params = { ...DEFAULTS, bottomHallwayTurn: 90 };
+    const result = buildStairwell(params);
+    const floors = result.collisionQuads.filter((q) => q.type === 'floor');
+    // At least one floor quad should have vertices extending in the +X direction
+    const hasXExtent = floors.some((q) =>
+      q.vertices.some((v) => v[0] > 1.0)
+    );
+    expect(hasXExtent).toBe(true);
+  });
 });

@@ -87,9 +87,31 @@ export function createConfigPanel(container, initialParams, onChange) {
     debounceTimer = setTimeout(() => onChange(params), 100);
   }
 
+  // Ceiling visibility toggle
+  const separator = document.createElement('hr');
+  separator.style.cssText = 'border-color:#334; margin:16px 0;';
+  container.appendChild(separator);
+
+  const vizTitle = document.createElement('h3');
+  vizTitle.textContent = 'Display';
+  vizTitle.style.cssText = 'font-size:14px; color:#64ffda; margin-bottom:8px;';
+  container.appendChild(vizTitle);
+
+  const ceilToggle = document.createElement('label');
+  ceilToggle.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:12px; color:#aaa; cursor:pointer;';
+  const ceilCheck = document.createElement('input');
+  ceilCheck.type = 'checkbox';
+  ceilCheck.checked = true;
+  ceilToggle.appendChild(ceilCheck);
+  ceilToggle.appendChild(document.createTextNode('Show Ceiling'));
+  container.appendChild(ceilToggle);
+
   return {
     getParams() {
       return { ...params };
+    },
+    onCeilingToggle(callback) {
+      ceilCheck.addEventListener('change', () => callback(ceilCheck.checked));
     },
   };
 }

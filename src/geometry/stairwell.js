@@ -278,10 +278,10 @@ function buildHallway(group, quads, params, position) {
   const turnRad = (turnDeg * Math.PI) / 180;
 
   if (position === 'bottom') {
-    hallGroup.rotation.y = turnRad;
+    hallGroup.rotation.y = -turnRad;
     hallGroup.position.set(0, 0, 0);
   } else {
-    hallGroup.rotation.y = Math.PI + turnRad;
+    hallGroup.rotation.y = Math.PI - turnRad;
     hallGroup.position.set(0, totalRise, totalRun);
   }
 
