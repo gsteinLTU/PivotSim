@@ -1,0 +1,26 @@
+{
+  "name": "pivotsim",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
+  }
+}
