@@ -4,9 +4,9 @@ export const DEFAULTS = {
   risePerStep: 0.19,
   runPerStep: 0.25,
   bottomHallwayWidth: 1.2,
-  bottomHallwayTurn: 0,     // degrees: 0, 90, or -90
+  bottomHallwayTurn: 90,     // degrees: 0, 90, or -90
   topHallwayWidth: 1.2,
-  topHallwayTurn: 0,        // degrees: 0, 90, or -90
+  topHallwayTurn: -90,        // degrees: 0, 90, or -90
   ceilingHeight: 2.4,
   slopedCeiling: true,
   hallwayLength: 3.0,       // default visualization length
