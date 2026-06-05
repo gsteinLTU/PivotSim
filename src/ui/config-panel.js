@@ -103,12 +103,24 @@ export function createConfigPanel(container, initialParams, onChange) {
   ceilToggle.appendChild(document.createTextNode('Show Ceiling'));
   container.appendChild(ceilToggle);
 
+  const quadDebugToggle = document.createElement('label');
+  quadDebugToggle.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:12px; color:#aaa; cursor:pointer; margin-top:8px;';
+  const quadDebugCheck = document.createElement('input');
+  quadDebugCheck.type = 'checkbox';
+  quadDebugCheck.checked = false;
+  quadDebugToggle.appendChild(quadDebugCheck);
+  quadDebugToggle.appendChild(document.createTextNode('Show Collision Quads'));
+  container.appendChild(quadDebugToggle);
+
   return {
     getParams() {
       return { ...params };
     },
     onCeilingToggle(callback) {
       ceilCheck.addEventListener('change', () => callback(ceilCheck.checked));
+    },
+    onQuadDebugToggle(callback) {
+      quadDebugCheck.addEventListener('change', () => callback(quadDebugCheck.checked));
     },
   };
 }

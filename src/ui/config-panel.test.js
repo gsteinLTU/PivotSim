@@ -31,11 +31,28 @@ describe('createConfigPanel', () => {
     const callback = vi.fn();
     panel.onCeilingToggle(callback);
 
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-    const ceilCheckbox = checkboxes[checkboxes.length - 1];
+    // Find ceiling checkbox by label text (robust to new checkboxes being added)
+    const labels = Array.from(container.querySelectorAll('label'));
+    const ceilLabel = labels.find((l) => l.textContent.includes('Show Ceiling'));
+    const ceilCheckbox = ceilLabel.querySelector('input[type="checkbox"]');
     ceilCheckbox.checked = false;
     ceilCheckbox.dispatchEvent(new Event('change'));
     expect(callback).toHaveBeenCalledWith(false);
+  });
+
+  it('onQuadDebugToggle calls callback with checkbox state on change', () => {
+    const container = makeContainer();
+    const onChange = vi.fn();
+    const panel = createConfigPanel(container, { ...DEFAULTS }, onChange);
+    const callback = vi.fn();
+    panel.onQuadDebugToggle(callback);
+
+    const labels = Array.from(container.querySelectorAll('label'));
+    const quadLabel = labels.find((l) => l.textContent.includes('Show Collision Quads'));
+    const quadCheckbox = quadLabel.querySelector('input[type="checkbox"]');
+    quadCheckbox.checked = true;
+    quadCheckbox.dispatchEvent(new Event('change'));
+    expect(callback).toHaveBeenCalledWith(true);
   });
 
   it('onChange is called after a number input changes', async () => {
