@@ -40,7 +40,15 @@
 <body>
   <div id="app">
     <div id="config-panel"></div>
-    <div id="viewport"></div>
+    <div id="viewport" style="position:relative;">
+      <div id="clearance-readout"
+           style="position:absolute; top:16px; left:16px; z-index:10;
+                  background:rgba(0,0,0,0.7); color:#22ff88; font-size:13px;
+                  font-family:monospace; padding:6px 14px; border-radius:4px;
+                  pointer-events:none; display:none;">
+        Clear
+      </div>
+    </div>
     <div id="timeline">Timeline (Phase 2)</div>
   </div>
   <script type="module" src="/src/main.js"></script>
