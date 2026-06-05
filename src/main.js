@@ -46,7 +46,7 @@ const panel = createConfigPanel(configContainer, { ...DEFAULTS }, (params) => {
 panel.onCeilingToggle((visible) => {
   if (!currentStairwell) return;
   currentStairwell.traverse((child) => {
-    if (child.material && child.material.opacity < 0.5) {
+    if (child.userData.isSurface) {
       child.visible = visible;
     }
   });

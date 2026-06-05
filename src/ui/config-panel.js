@@ -29,8 +29,6 @@ export function createConfigPanel(container, initialParams, onChange) {
   title.style.cssText = 'margin-bottom:16px; font-size:18px; color:#64ffda;';
   container.appendChild(title);
 
-  const inputs = {};
-
   for (const def of FIELD_DEFS) {
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'margin-bottom:12px;';
@@ -77,7 +75,6 @@ export function createConfigPanel(container, initialParams, onChange) {
       });
     }
 
-    inputs[def.key] = input;
     wrapper.appendChild(input);
     container.appendChild(wrapper);
   }

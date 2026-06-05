@@ -113,7 +113,9 @@ export function buildStairwell(params) {
     ceilGeo.setAttribute('position', new THREE.BufferAttribute(ceilVerts, 3));
     ceilGeo.setIndex(ceilIndices);
     ceilGeo.computeVertexNormals();
-    group.add(new THREE.Mesh(ceilGeo, ceilMat));
+    const ceilMesh = new THREE.Mesh(ceilGeo, ceilMat);
+    ceilMesh.userData.isSurface = true;
+    group.add(ceilMesh);
 
     collisionQuads.push({
       type: 'ceiling',
@@ -155,7 +157,9 @@ function addStairWall(group, quads, material, opts) {
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
     geo.setIndex([0, 1, 2, 0, 2, 3]);
     geo.computeVertexNormals();
-    group.add(new THREE.Mesh(geo, material));
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.userData.isSurface = true;
+    group.add(mesh);
 
     quads.push({
       type,
@@ -172,9 +176,8 @@ function addStairWall(group, quads, material, opts) {
 
 function buildHallway(group, quads, params, position) {
   const {
-    numSteps, risePerStep, runPerStep, stairWidth, ceilingHeight, hallwayLength,
+    numSteps, risePerStep, runPerStep, ceilingHeight, hallwayLength,
   } = params;
-  const halfW = stairWidth / 2;
   const totalRise = numSteps * risePerStep;
   const totalRun = numSteps * runPerStep;
 
@@ -225,6 +228,7 @@ function buildHallway(group, quads, params, position) {
   const lwMesh = new THREE.Mesh(lwGeo, wallMat);
   lwMesh.rotation.y = Math.PI / 2;
   lwMesh.position.set(-hallHalfW, ceilingHeight / 2, -len / 2);
+  lwMesh.userData.isSurface = true;
   hallGroup.add(lwMesh);
 
   hallQuads.push({
@@ -243,6 +247,7 @@ function buildHallway(group, quads, params, position) {
   const rwMesh = new THREE.Mesh(rwGeo, wallMat);
   rwMesh.rotation.y = -Math.PI / 2;
   rwMesh.position.set(hallHalfW, ceilingHeight / 2, -len / 2);
+  rwMesh.userData.isSurface = true;
   hallGroup.add(rwMesh);
 
   hallQuads.push({
@@ -261,6 +266,7 @@ function buildHallway(group, quads, params, position) {
   const cMesh = new THREE.Mesh(cGeo, ceilMat);
   cMesh.rotation.x = Math.PI / 2;
   cMesh.position.set(0, ceilingHeight, -len / 2);
+  cMesh.userData.isSurface = true;
   hallGroup.add(cMesh);
 
   hallQuads.push({
