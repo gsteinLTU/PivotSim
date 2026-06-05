@@ -3,6 +3,7 @@ import { createScene } from './viewer/scene.js';
 import { createConfigPanel } from './ui/config-panel.js';
 import { buildStairwell } from './geometry/stairwell.js';
 import { DEFAULTS } from './defaults.js';
+import { buildQuadDebug } from './viewer/debug.js';
 
 const viewport = document.getElementById('viewport');
 const configContainer = document.getElementById('config-panel');
@@ -10,6 +11,7 @@ const configContainer = document.getElementById('config-panel');
 const { scene, camera, renderer, controls } = createScene(viewport);
 
 let currentStairwell = null;
+let currentQuadDebug = null;
 
 function rebuildStairwell(params) {
   if (currentStairwell) {
@@ -20,9 +22,21 @@ function rebuildStairwell(params) {
     });
   }
 
-  const { group } = buildStairwell(params);
+  if (currentQuadDebug) {
+    scene.remove(currentQuadDebug);
+    currentQuadDebug.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) child.material.dispose();
+    });
+  }
+
+  const { group, collisionQuads } = buildStairwell(params);
   scene.add(group);
   currentStairwell = group;
+
+  currentQuadDebug = buildQuadDebug(collisionQuads);
+  currentQuadDebug.visible = false;
+  scene.add(currentQuadDebug);
 
   // Auto-frame the camera on the stairwell
   const box = new THREE.Box3().setFromObject(group);
@@ -50,6 +64,10 @@ panel.onCeilingToggle((visible) => {
       child.visible = visible;
     }
   });
+});
+
+panel.onQuadDebugToggle((visible) => {
+  if (currentQuadDebug) currentQuadDebug.visible = visible;
 });
 
 // Initial build
