@@ -81,7 +81,7 @@ export function createConfigPanel(container, initialParams, onChange) {
 
   function scheduleUpdate() {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => onChange(params), 100);
+    debounceTimer = setTimeout(() => onChange({ ...params }), 100);
   }
 
   // Ceiling visibility toggle

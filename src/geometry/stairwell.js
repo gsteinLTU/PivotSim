@@ -125,7 +125,9 @@ export function buildStairwell(params) {
         [halfW, ceilY1, totalRun],
         [-halfW, ceilY1, totalRun],
       ],
-      normal: [0, -1, 0], // approximate — actual normal is angled
+      // Normal points from ceiling surface into the stairwell (downward + toward stair base)
+      // Computed as cross product of width edge × slope edge, then normalized
+      normal: new THREE.Vector3(0, -totalRun, totalRise).normalize().toArray(),
     });
   }
 
@@ -305,8 +307,10 @@ function buildHallway(group, quads, params, position) {
       vec.add(pos);
       return [vec.x, vec.y, vec.z];
     });
+    // transformDirection uses the upper-left 3x3 only (ignores translation),
+    // which is correct for direction vectors like normals.
     const nVec = new THREE.Vector3(...quad.normal);
-    nVec.applyMatrix4(matrix);
+    nVec.transformDirection(matrix);
     quads.push({
       type: quad.type,
       vertices: transformed,
