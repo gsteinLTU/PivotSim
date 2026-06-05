@@ -1,3 +1,5 @@
+import { BOX_DEFAULTS, BOX_POSE_DEFAULTS } from '../defaults.js';
+
 const FIELD_DEFS = [
   { key: 'stairWidth', label: 'Stair Width (m)', type: 'number', min: 0.5, max: 3, step: 0.05 },
   { key: 'numSteps', label: 'Number of Steps', type: 'number', min: 1, max: 30, step: 1 },
@@ -23,6 +25,12 @@ const FIELD_DEFS = [
 export function createConfigPanel(container, initialParams, onChange) {
   const params = { ...initialParams };
   let debounceTimer = null;
+  let boxDimsTimer = null;
+  let boxPoseTimer = null;
+  let boxDimsCallback = null;
+  let boxPoseCallback = null;
+  const boxDims = { ...BOX_DEFAULTS };
+  const boxPose = { ...BOX_POSE_DEFAULTS };
 
   const title = document.createElement('h2');
   title.textContent = 'Stairwell Config';
@@ -112,15 +120,104 @@ export function createConfigPanel(container, initialParams, onChange) {
   quadDebugToggle.appendChild(document.createTextNode('Show Collision Quads'));
   container.appendChild(quadDebugToggle);
 
+  // ── Box Dimensions ──────────────────────────────────────────────────────
+  const boxSep = document.createElement('hr');
+  boxSep.style.cssText = 'border-color:#334; margin:16px 0;';
+  container.appendChild(boxSep);
+
+  const boxDimsTitle = document.createElement('h3');
+  boxDimsTitle.textContent = 'Box Dimensions';
+  boxDimsTitle.style.cssText = 'font-size:14px; color:#64ffda; margin-bottom:8px;';
+  container.appendChild(boxDimsTitle);
+
+  for (const def of [
+    { key: 'length', label: 'Length (m)', min: 0.3, max: 4.0, step: 0.05 },
+    { key: 'width',  label: 'Width (m)',  min: 0.3, max: 2.0, step: 0.05 },
+    { key: 'height', label: 'Height (m)', min: 0.1, max: 1.5, step: 0.05 },
+  ]) {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'margin-bottom:12px;';
+    const lbl = document.createElement('label');
+    lbl.textContent = def.label;
+    lbl.style.cssText = 'display:block; font-size:12px; margin-bottom:4px; color:#aaa;';
+    wrapper.appendChild(lbl);
+    const inp = document.createElement('input');
+    inp.type = 'number';
+    inp.value = boxDims[def.key];
+    inp.min = def.min;
+    inp.max = def.max;
+    inp.step = def.step;
+    inp.style.cssText = 'width:100%; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
+    inp.addEventListener('input', () => {
+      boxDims[def.key] = Number(inp.value);
+      clearTimeout(boxDimsTimer);
+      boxDimsTimer = setTimeout(() => { if (boxDimsCallback) boxDimsCallback({ ...boxDims }); }, 100);
+    });
+    wrapper.appendChild(inp);
+    container.appendChild(wrapper);
+  }
+
+  // ── Box Pose ────────────────────────────────────────────────────────────
+  const poseSep = document.createElement('hr');
+  poseSep.style.cssText = 'border-color:#334; margin:16px 0;';
+  container.appendChild(poseSep);
+
+  const boxPoseTitle = document.createElement('h3');
+  boxPoseTitle.textContent = 'Box Pose';
+  boxPoseTitle.style.cssText = 'font-size:14px; color:#64ffda; margin-bottom:8px;';
+  container.appendChild(boxPoseTitle);
+
+  for (const def of [
+    { key: 'x',     label: 'X (m)',      min: -6, max: 6,    step: 0.05 },
+    { key: 'y',     label: 'Y (m)',      min: -1, max: 5,    step: 0.05 },
+    { key: 'z',     label: 'Z (m)',      min: -6, max: 6,    step: 0.05 },
+    { key: 'yaw',   label: 'Yaw (°)',    min: -180, max: 180, step: 1 },
+    { key: 'pitch', label: 'Pitch (°)',  min: -90,  max: 90,  step: 1 },
+    { key: 'roll',  label: 'Roll (°)',   min: -180, max: 180, step: 1 },
+  ]) {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'margin-bottom:12px;';
+    const lbl = document.createElement('label');
+    lbl.textContent = def.label;
+    lbl.style.cssText = 'display:block; font-size:12px; margin-bottom:4px; color:#aaa;';
+    wrapper.appendChild(lbl);
+    const inp = document.createElement('input');
+    inp.type = 'number';
+    inp.value = boxPose[def.key];
+    inp.min = def.min;
+    inp.max = def.max;
+    inp.step = def.step;
+    inp.style.cssText = 'width:100%; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
+    inp.addEventListener('input', () => {
+      boxPose[def.key] = Number(inp.value);
+      clearTimeout(boxPoseTimer);
+      boxPoseTimer = setTimeout(() => { if (boxPoseCallback) boxPoseCallback({ ...boxPose }); }, 100);
+    });
+    wrapper.appendChild(inp);
+    container.appendChild(wrapper);
+  }
+
   return {
     getParams() {
       return { ...params };
+    },
+    getBoxDims() {
+      return { ...boxDims };
+    },
+    getBoxPose() {
+      return { ...boxPose };
     },
     onCeilingToggle(callback) {
       ceilCheck.addEventListener('change', () => callback(ceilCheck.checked));
     },
     onQuadDebugToggle(callback) {
       quadDebugCheck.addEventListener('change', () => callback(quadDebugCheck.checked));
+    },
+    onBoxDimsChange(callback) {
+      boxDimsCallback = callback;
+    },
+    onBoxPoseChange(callback) {
+      boxPoseCallback = callback;
     },
   };
 }

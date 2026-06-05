@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createConfigPanel } from './config-panel.js';
-import { DEFAULTS } from '../defaults.js';
+import { DEFAULTS, BOX_DEFAULTS, BOX_POSE_DEFAULTS } from '../defaults.js';
 
 describe('createConfigPanel', () => {
   function makeContainer() {
@@ -66,5 +66,44 @@ describe('createConfigPanel', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(onChange).toHaveBeenCalled();
+  });
+
+  it('getBoxDims returns default box dimensions', () => {
+    const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
+    const dims = panel.getBoxDims();
+    expect(dims.length).toBe(2.0);
+    expect(dims.width).toBe(0.8);
+    expect(dims.height).toBe(0.5);
+  });
+
+  it('getBoxPose returns default box pose', () => {
+    const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
+    const pose = panel.getBoxPose();
+    expect(pose.y).toBeCloseTo(0.25);
+    expect(pose.z).toBeCloseTo(-1.0);
+    expect(pose.yaw).toBe(0);
+  });
+
+  it('onBoxDimsChange and onBoxPoseChange are functions', () => {
+    const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
+    expect(typeof panel.onBoxDimsChange).toBe('function');
+    expect(typeof panel.onBoxPoseChange).toBe('function');
+  });
+
+  it('onBoxDimsChange is called after a box dim input changes', async () => {
+    const container = document.createElement('div');
+    const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    const cb = vi.fn();
+    panel.onBoxDimsChange(cb);
+
+    // Box dim inputs follow all the stairwell inputs; find by label text
+    const labels = Array.from(container.querySelectorAll('label'));
+    const lengthLabel = labels.find((l) => l.textContent === 'Length (m)');
+    const input = lengthLabel.nextElementSibling;
+    input.value = '1.5';
+    input.dispatchEvent(new Event('input'));
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(cb).toHaveBeenCalledWith(expect.objectContaining({ length: 1.5 }));
   });
 });
