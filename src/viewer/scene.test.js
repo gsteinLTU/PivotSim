@@ -19,7 +19,7 @@ vi.mock('three', async (importOriginal) => {
 vi.mock('three/addons/controls/OrbitControls.js', () => {
   class MockOrbitControls {
     constructor() {
-      this.target = { set: vi.fn() };
+      this.target = { set: vi.fn(), copy: vi.fn() };
       this.update = vi.fn();
     }
   }
