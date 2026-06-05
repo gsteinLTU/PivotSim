@@ -178,7 +178,7 @@ function addStairWall(group, quads, material, opts) {
 
 function buildHallway(group, quads, params, position) {
   const {
-    numSteps, risePerStep, runPerStep, ceilingHeight, hallwayLength,
+    numSteps, risePerStep, runPerStep, stairWidth, ceilingHeight, hallwayLength,
   } = params;
   const totalRise = numSteps * risePerStep;
   const totalRun = numSteps * runPerStep;
@@ -191,6 +191,7 @@ function buildHallway(group, quads, params, position) {
     : params.topHallwayTurn;
 
   const hallHalfW = hallwayWidth / 2;
+  const stairHalfW = stairWidth / 2;
 
   // Create a sub-group for the hallway, then rotate it into position
   const hallGroup = new THREE.Group();
@@ -233,13 +234,18 @@ function buildHallway(group, quads, params, position) {
   lwMesh.userData.isSurface = true;
   hallGroup.add(lwMesh);
 
+  let leftStartZ = 0;
+  if (turnDeg < 0) {
+      leftStartZ = -stairWidth;
+  }
+
   hallQuads.push({
     type: 'wall-left',
     vertices: [
-      [-hallHalfW, 0, 0],
+      [-hallHalfW, 0, leftStartZ],
       [-hallHalfW, 0, -len],
       [-hallHalfW, ceilingHeight, -len],
-      [-hallHalfW, ceilingHeight, 0],
+      [-hallHalfW, ceilingHeight, leftStartZ],
     ],
     normal: [1, 0, 0],
   });
@@ -252,13 +258,18 @@ function buildHallway(group, quads, params, position) {
   rwMesh.userData.isSurface = true;
   hallGroup.add(rwMesh);
 
+  let rightStartZ = 0;
+  if (turnDeg > 0) {
+      rightStartZ = -stairWidth;
+  }
+
   hallQuads.push({
     type: 'wall-right',
     vertices: [
-      [hallHalfW, 0, 0],
+      [hallHalfW, 0, rightStartZ],
       [hallHalfW, 0, -len],
       [hallHalfW, ceilingHeight, -len],
-      [hallHalfW, ceilingHeight, 0],
+      [hallHalfW, ceilingHeight, rightStartZ],
     ],
     normal: [-1, 0, 0],
   });
@@ -282,6 +293,26 @@ function buildHallway(group, quads, params, position) {
     normal: [0, -1, 0],
   });
 
+  // End cap (only when hallway is turned, fills gap where unrotated hallway meets stairwell)
+  if (turnDeg !== 0) {
+    const ecGeo = new THREE.PlaneGeometry(hallwayWidth, ceilingHeight);
+    const ecMesh = new THREE.Mesh(ecGeo, wallMat);
+    ecMesh.position.set(0, ceilingHeight / 2, -len);
+    ecMesh.userData.isSurface = true;
+    hallGroup.add(ecMesh);
+
+    hallQuads.push({
+      type: 'wall-end',
+      vertices: [
+        [-hallHalfW, 0, 0],
+        [hallHalfW, 0, 0],
+        [hallHalfW, ceilingHeight, 0],
+        [-hallHalfW, ceilingHeight, 0],
+      ],
+      normal: [0, 0, 1],
+    });
+  }
+
   // Position and rotate the hallway group
   const turnRad = (turnDeg * Math.PI) / 180;
 
@@ -291,6 +322,14 @@ function buildHallway(group, quads, params, position) {
   } else {
     hallGroup.rotation.y = Math.PI - turnRad;
     hallGroup.position.set(0, totalRise, totalRun);
+  }
+
+  if (turnDeg !== 0) {
+    console.log(`Applying ${turnDeg}° turn to ${position} hallway`);
+    // Offset by half the stair width to align with the stairwell opening, and half the hallway width to align with the hallway centerline.
+    hallGroup.position.x -= (stairHalfW) * (turnDeg > 0 ? 1 : -1) * (position === 'bottom' ? 1 : -1); // Shift opposite to turn direction to keep aligned with stairwell
+    hallGroup.position.z += (hallHalfW) * (position === 'bottom' ? -1 : 1);
+    console.log(`Hallway position after turn adjustment: (${hallGroup.position.x.toFixed(2)}, ${hallGroup.position.y.toFixed(2)}, ${hallGroup.position.z.toFixed(2)})`);
   }
 
   group.add(hallGroup);
@@ -311,6 +350,7 @@ function buildHallway(group, quads, params, position) {
     // which is correct for direction vectors like normals.
     const nVec = new THREE.Vector3(...quad.normal);
     nVec.transformDirection(matrix);
+
     quads.push({
       type: quad.type,
       vertices: transformed,
