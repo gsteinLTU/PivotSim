@@ -11,3 +11,18 @@ export const DEFAULTS = {
   slopedCeiling: true,
   hallwayLength: 3.0,       // default visualization length
 };
+
+export const BOX_DEFAULTS = {
+  length: 2.0,   // m, longest dimension (runs along stairwell Z axis at rest)
+  width: 0.8,    // m, horizontal cross-section
+  height: 0.5,   // m, vertical dimension
+};
+
+export const BOX_POSE_DEFAULTS = {
+  x: 0.0,
+  y: 0.25,    // half of default height — box sits on floor
+  z: -1.0,    // 1m into bottom hallway
+  yaw: 0,     // degrees, rotation around Y (vertical) axis
+  pitch: 0,   // degrees, rotation around X axis
+  roll: 0,    // degrees, rotation around Z axis
+};
