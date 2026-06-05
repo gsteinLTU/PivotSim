@@ -22,6 +22,7 @@ function rebuildStairwell(params) {
     });
   }
 
+  const prevQuadDebugVisible = currentQuadDebug ? currentQuadDebug.visible : false;
   if (currentQuadDebug) {
     scene.remove(currentQuadDebug);
     currentQuadDebug.traverse((child) => {
@@ -35,7 +36,7 @@ function rebuildStairwell(params) {
   currentStairwell = group;
 
   currentQuadDebug = buildQuadDebug(collisionQuads);
-  currentQuadDebug.visible = false;
+  currentQuadDebug.visible = prevQuadDebugVisible;
   scene.add(currentQuadDebug);
 
   // Auto-frame the camera on the stairwell
