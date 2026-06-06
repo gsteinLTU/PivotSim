@@ -50,6 +50,17 @@ export function lerpPose(a, b, t) {
   };
 }
 
+/**
+ * Returns a new poses array where poses[startIdx..endIdx-1][dof] += delta.
+ * Used by forward and backward propagate SA moves.
+ * Only rotation DOFs (yaw, pitch, roll) should be passed as dof.
+ */
+export function applyRotationPropagation(poses, startIdx, endIdx, dof, delta) {
+  return poses.map((p, j) =>
+    j >= startIdx && j < endIdx ? { ...p, [dof]: p[dof] + delta } : { ...p }
+  );
+}
+
 // Pure-math OBB — same convention as box.js computeOBB (YXZ Euler), no Three.js.
 // R = Ry(yaw) × Rx(pitch) × Rz(roll); columns are local-axis world directions.
 function computeOBB({ x, y, z, yaw, pitch, roll }, halfExtents) {
@@ -241,7 +252,7 @@ export async function optimizeTrajectory(
   let bestSegData = segData.map(s => ({ ...s }));
   let bestEnergy  = energy;
 
-  const T_START = 5.0, T_END = 0.001;
+  const T_START = 10.0, T_END = 0.001;
   const COOL = Math.pow(T_END / T_START, 1 / Math.max(MAX_ITER, 1));
   let T = T_START;
 
