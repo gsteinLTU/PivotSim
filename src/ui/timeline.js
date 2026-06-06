@@ -29,12 +29,7 @@ export function createTimeline(container, callbacks) {
           border-radius:4px;padding:4px 12px;background:transparent;cursor:pointer;">
           ✕ Cancel
         </button>
-        <span id="tl-temp" style="${MONO}color:#64ffda;">T=5.000</span>
-        <span id="tl-iter" style="${MONO}color:#aaa;">0 / 50,000</span>
-        <div style="flex:1;height:6px;background:#1a2a3a;border-radius:3px;overflow:hidden;">
-          <div id="tl-ebar" style="height:100%;width:0%;background:#64ffda;border-radius:3px;
-            transition:width 0.4s;"></div>
-        </div>
+        <div id="tl-planner-progress" style="display:flex;flex:1;align-items:center;gap:12px;"></div>
       </div>`;
     container.querySelector('#tl-cancel').addEventListener('click', onCancel);
   }
@@ -120,13 +115,9 @@ export function createTimeline(container, callbacks) {
     else if (state === 'done')    renderDone(data);
   }
 
-  function updateProgress({ energy, temperature, iteration }) {
-    const t = container.querySelector('#tl-temp');
-    const i = container.querySelector('#tl-iter');
-    const b = container.querySelector('#tl-ebar');
-    if (t) t.textContent = `T=${temperature.toFixed(3)}`;
-    if (i) i.textContent = `${iteration.toLocaleString()} / 50,000`;
-    if (b) b.style.width = `${Math.min(100, (iteration / 50000) * 100)}%`;
+  function updateProgress(data, formatter) {
+    const progressEl = container.querySelector('#tl-planner-progress');
+    if (progressEl && formatter) formatter(data, progressEl);
   }
 
   function setResult(data) {
