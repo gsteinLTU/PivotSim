@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createConfigPanel } from './config-panel.js';
+import { createConfigPanel, toMeters, fromMeters } from './config-panel.js';
 import { DEFAULTS, BOX_DEFAULTS, BOX_POSE_DEFAULTS } from '../defaults.js';
 
 describe('createConfigPanel', () => {
@@ -123,5 +123,35 @@ describe('createConfigPanel', () => {
     panel.unlock();
     const inputs = Array.from(container.querySelectorAll('input, select'));
     expect(inputs.every(el => !el.disabled)).toBe(true);
+  });
+});
+
+describe('toMeters', () => {
+  it('returns value unchanged for m', () => {
+    expect(toMeters(1.5, 'm')).toBeCloseTo(1.5);
+  });
+  it('converts ft to m', () => {
+    expect(toMeters(1, 'ft')).toBeCloseTo(0.3048);
+  });
+  it('converts in to m', () => {
+    expect(toMeters(84, 'in')).toBeCloseTo(2.1336);
+  });
+  it('converts 12 in to same as 1 ft', () => {
+    expect(toMeters(12, 'in')).toBeCloseTo(toMeters(1, 'ft'));
+  });
+});
+
+describe('fromMeters', () => {
+  it('returns value unchanged for m', () => {
+    expect(fromMeters(1.5, 'm')).toBeCloseTo(1.5);
+  });
+  it('converts m to ft', () => {
+    expect(fromMeters(0.3048, 'ft')).toBeCloseTo(1.0);
+  });
+  it('converts m to in', () => {
+    expect(fromMeters(0.0254, 'in')).toBeCloseTo(1.0);
+  });
+  it('round-trips m → in → m', () => {
+    expect(toMeters(fromMeters(1.2, 'in'), 'in')).toBeCloseTo(1.2);
   });
 });

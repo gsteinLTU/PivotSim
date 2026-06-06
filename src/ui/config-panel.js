@@ -1,5 +1,16 @@
 import { BOX_DEFAULTS, BOX_POSE_DEFAULTS } from '../defaults.js';
 
+// Meters per unit
+const TO_METERS = { m: 1, ft: 0.3048, in: 0.0254 };
+
+export function toMeters(value, unit) {
+  return value * TO_METERS[unit];
+}
+
+export function fromMeters(value, unit) {
+  return value / TO_METERS[unit];
+}
+
 const FIELD_DEFS = [
   { key: 'stairWidth', label: 'Stair Width (m)', type: 'number', min: 0.5, max: 3, step: 0.05 },
   { key: 'numSteps', label: 'Number of Steps', type: 'number', min: 1, max: 30, step: 1 },
