@@ -6,7 +6,7 @@ Add an automated trajectory solver that determines whether a box can navigate a 
 
 ## Context
 
-Builds on Phase 1.5 (box model + SAT collision detection). The stairwell geometry, collision quad format, OBB computation, and `checkCollisions` API are unchanged.
+Builds on Phase 1.5 (box model + SAT collision detection). The stairwell geometry, collision quad format, OBB computation, and `checkCollisions` API are unchanged except for the signed clearance extension noted below.
 
 ---
 
@@ -15,11 +15,36 @@ Builds on Phase 1.5 (box model + SAT collision detection). The stairwell geometr
 | File | Purpose |
 |------|---------|
 | `src/solver/path.js` | Centerline polyline + arc-length parameterization |
-| `src/solver/trajectory.js` | SA energy function + optimizer |
+| `src/solver/trajectory.js` | SA energy function + variable-length optimizer |
 | `src/solver/worker.js` | Web Worker wrapper — runs SA off the main thread |
 | `src/ui/timeline.js` | Timeline bar: idle → solving → done states |
 
-**Modified files:** `src/main.js` (Solve wiring, result banner, ghost trail), `index.html` (timeline div replacement, result banner div), `src/solver/collision.js` (signed clearance), `src/ui/config-panel.js` (lock/unlock API).
+**Modified files:** `src/main.js` (Solve wiring, result banner, ghost trail), `index.html` (timeline height, result banner div), `src/solver/collision.js` (signed clearance), `src/ui/config-panel.js` (lock/unlock API).
+
+---
+
+## Time Model
+
+Time is **derived from geometry**, never stored on poses. Given constants:
+
+```js
+MAX_LINEAR_SPEED  = 0.5   // m/s
+MAX_ANGULAR_SPEED = 0.5   // rad/s (~30°/s)
+```
+
+The duration of a segment between adjacent poses is:
+
+```js
+segmentDuration(a, b) = Math.max(
+  euclideanDelta(a, b) / MAX_LINEAR_SPEED,
+  angularDelta(a, b)   / MAX_ANGULAR_SPEED
+)
+```
+
+Total trajectory time = sum of all segment durations. This is used for:
+- **Playback**: scrubber maps to real seconds; tight corners with lots of rotation get more scrubber space than long straight slides.
+- **Between-pose sampling density**: K interpolated collision checks per segment is proportional to `segmentDuration` (longer/slower segments get more checks).
+- **Energy**: a `w_time × totalTime` term discourages unnecessarily slow or winding paths.
 
 ---
 
@@ -27,41 +52,39 @@ Builds on Phase 1.5 (box model + SAT collision detection). The stairwell geometr
 
 ### Purpose
 
-Compute a centerline polyline through the stairwell and expose evenly-spaced sample positions. These seed the SA initial state.
+Compute a centerline polyline through the stairwell. Provides the two initial poses that seed the SA (start and end of the path).
 
 ### API
 
 ```js
 export function buildCenterline(params)
 // Returns: { points: [[x,y,z], ...], totalLength: number }
-// Points: bottom hallway end → hallway/stair junction →
+// Points: bottom hallway far end → hallway/stair junction →
 //         one point per step tread center →
-//         stair/hallway junction → top hallway end.
-// Arc-length parameterized: consecutive points are not necessarily
-// equal spacing — caller uses sampleN for even spacing.
+//         stair/hallway junction → top hallway far end.
 
-export function sampleN(centerline, n)
-// Returns: Array of n evenly-spaced { position: [x,y,z], forward: [dx,dy,dz] }
-// forward is the unit tangent direction at that point (direction of travel).
-// Used as starting position guess for each SA pose.
+export function getEndpoints(centerline)
+// Returns: { start: [x,y,z], end: [x,y,z] }
+// The entry and exit points of the stairwell path.
+// Used to build the two initial SA poses.
 ```
 
 ### Geometry
 
-The centerline follows the floor of each segment at horizontal midpoint (x=0 for straight hallways, centerline of the hallway width for turned hallways):
+The centerline follows the floor at horizontal midpoint:
 
-1. Bottom hallway: from the far end of the bottom hallway to z=0, at y=0
-2. Stair flight: one point per step at (0, i×risePerStep + risePerStep/2, i×runPerStep + runPerStep/2) — center of each tread surface
-3. Top hallway: from (0, totalRise, totalRun) to the far end of the top hallway
+1. Bottom hallway: from the far end back to z=0, at y=0, x=0
+2. Stair flight: one point per step at `(0, i×rise + rise/2, i×run + run/2)`
+3. Top hallway: from `(0, totalRise, totalRun)` to the far end
 
-Turns are handled by following the rotated hallway group's local axes (same rotation matrix used in `stairwell.js`).
+Turns are handled by following the rotated hallway group's local coordinate axes (same transform as in `stairwell.js`).
 
 ### Tests
 
-- `buildCenterline` returns a point array with at least `numSteps + 2` entries
-- `sampleN(centerline, 10)` returns exactly 10 objects with `position` and `forward` properties
-- `forward` vectors are unit length
-- First and last sample positions are near the hallway ends
+- `buildCenterline` returns at least `numSteps + 2` points
+- `getEndpoints` returns `start` and `end` as length-3 arrays
+- First point is in the bottom hallway (y ≈ 0, z < 0)
+- Last point is in the top hallway (y ≈ totalRise)
 
 ---
 
@@ -69,7 +92,7 @@ Turns are handled by following the rotated hallway group's local axes (same rota
 
 ### Purpose
 
-Pure SA optimizer. No Three.js dependency. Takes stairwell collision quads, box half-extents, and N starting poses; returns an optimized trajectory.
+Pure SA optimizer with a variable-length pose array. No Three.js dependency.
 
 ### Types
 
@@ -77,105 +100,126 @@ Pure SA optimizer. No Three.js dependency. Takes stairwell collision quads, box 
 // Pose — all angles in RADIANS
 { x, y, z, yaw, pitch, roll }
 
+// Segment — derived, never stored
+{ duration: number, kSamples: number }  // computed on demand
+
 // TrajectoryResult
 {
-  poses: Pose[],         // length N
-  fits: boolean,         // true if best energy has zero collision penalty
-  tightestIndex: number, // index of pose with minimum clearance
+  poses: Pose[],          // variable length, ≥ 2
+  segmentTimes: number[], // length poses.length - 1; duration of each segment
+  totalTime: number,      // sum of segmentTimes
+  fits: boolean,          // true if best energy has zero collision penalty
+  tightestIndex: number,  // index of pose with minimum clearance
   finalEnergy: number,
 }
 ```
 
 ### Energy Function
 
+Computed over all poses and between-pose samples:
+
 ```
-E = w_col  × Σ max(0, -clearance_i)²        // penetration depth squared
-  - w_clr  × Σ min(clearance_i, CAP)         // clearance reward, capped at CAP=0.3m
-  + w_rot  × Σ angularDelta(pose_i, pose_{i+1})
-  + w_pos  × Σ euclideanDelta(pose_i, pose_{i+1})
+E = w_col  × Σ_segments  segmentCollisionEnergy(i, i+1)
+  - w_clr  × Σ_segments  segmentClearanceReward(i, i+1)
+  + w_rot  × Σ_segments  angularDelta(pose_i, pose_{i+1})
+  + w_pos  × Σ_segments  euclideanDelta(pose_i, pose_{i+1})
+  + w_time × totalTime
 ```
 
-Default weights: `{ w_col: 100, w_clr: 1, w_rot: 0.1, w_pos: 0.5 }`. Penetration depth squared gives a stronger gradient near walls than linear would.
+Default weights: `{ w_col: 100, w_clr: 1, w_rot: 0.1, w_pos: 0.5, w_time: 0.01 }`.
 
-`clearance_i` is a **signed** clearance value: positive when clear, negative when penetrating. This requires a small change to `collision.js` (see below): `testOBBvsQuad` should return `clearance: maxGap` (the actual value, not clamped to 0), and `checkCollisions` should return `minClearance` as the minimum across all quads (can be negative). Existing callers are unaffected — they already check `collides` before using `minClearance`.
+**`segmentCollisionEnergy(i, i+1)`**: sample K interpolated poses between pose_i and pose_{i+1}, where `K = Math.max(5, Math.ceil(segmentDuration(i, i+1) / 0.2))`. For each sample, compute signed clearance. Find the sample with the worst (most negative) clearance, then check several additional samples clustered around it (±10% of segment length) to better locate the true minimum. Sum of `max(0, -clearance)²` across all samples.
 
-`angularDelta(a, b)`: sum of absolute differences in yaw, pitch, roll (in radians). Simple and cheap; a proper quaternion geodesic is not needed here.
+**`segmentClearanceReward(i, i+1)`**: sum of `min(clearance, CAP)` across the same samples (CAP = 0.3m). Rewards being away from walls.
 
-`euclideanDelta(a, b)`: Euclidean distance between `[a.x, a.y, a.z]` and `[b.x, b.y, b.z]`.
+**Signed clearance**: `checkCollisions` returns a signed `minClearance` — negative when penetrating (see `collision.js` changes). This is what `clearance_i` refers to throughout.
 
 ### SA Loop
+
+Three move types, chosen randomly each iteration:
+
+**Perturb** (70% of moves): pick a random pose index (excluding first and last, which are fixed at the start/end endpoints), perturb one random DOF by `Normal(0, σ × T)`:
+```
+σ = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.3, pitch: 0.2, roll: 0.2 }
+```
+
+**Split** (20% of moves): find the segment with the highest `segmentCollisionEnergy`. Insert a new pose at the lerp midpoint of that segment (position and orientation), plus a small random perturbation. This is how the trajectory grows resolution at problem spots.
+
+**Merge** (10% of moves): find a non-endpoint pose where removing it (and re-checking the combined segment from its predecessor to its successor) does not increase `segmentCollisionEnergy`. If found, remove it. Keeps the trajectory compact. If no mergeable pose exists, skip.
 
 ```
 T_start = 5.0
 T_end   = 0.001
 maxIter = 50000
 cooling = geometric: T *= (T_end / T_start)^(1 / maxIter) each iteration
-
-perturb step:
-  pick random i in [0, N)
-  pick random DOF in { x, y, z, yaw, pitch, roll }
-  delta ~ Normal(0, sigma × T)  where sigma = { x:0.1, y:0.1, z:0.1, yaw:0.3, pitch:0.2, roll:0.2 }
-  candidate = copy poses with pose[i][DOF] += delta
-  ΔE = E(candidate) - E(current)
-  if ΔE < 0 or rand() < exp(-ΔE / T): accept candidate
 ```
 
-Progress callback invoked every 500 iterations with `{ poses, energy, temperature, iteration }`.
+Accept/reject via Metropolis criterion: accept if ΔE < 0, else accept with probability `exp(-ΔE / T)`.
+
+Progress callback invoked every 500 iterations with current best state.
+
+### Initial State
+
+Two poses:
+- `poses[0]`: position = centerline start, all angles = 0 (fixed, never perturbed)
+- `poses[1]`: position = centerline end, all angles = 0 (fixed, never perturbed)
+
+The direct path between them obviously collides — SA immediately wants to split it.
 
 ### API
 
 ```js
-export function optimizeTrajectory(collisionQuads, halfExtents, initialPoses, weights, onProgress)
+export function optimizeTrajectory(collisionQuads, halfExtents, centerline, weights, onProgress)
 // collisionQuads: from buildStairwell
 // halfExtents: [hWidth, hHeight, hLength] from getHalfExtents
-// initialPoses: Pose[] at centerline positions (from sampleN), angles = 0
-// weights: { w_col, w_clr, w_rot, w_pos } — uses defaults if omitted
-// onProgress: (progress) => void, called every 500 iterations
+// centerline: from buildCenterline (used for endpoint positions)
+// weights: { w_col, w_clr, w_rot, w_pos, w_time } — uses defaults if omitted
+// onProgress: ({ poses, segmentTimes, totalTime, energy, temperature, iteration }) => void
 // Returns: TrajectoryResult
 ```
 
 ### Tests
 
-- Returns a `TrajectoryResult` with `poses.length === n`
+- Returns `TrajectoryResult` with `poses.length >= 2`
+- `segmentTimes.length === poses.length - 1`
+- `totalTime` equals sum of `segmentTimes`
 - `fits` is `false` when box is larger than stairwell in all dimensions
-- Energy decreases (or stays same) on average over the run (test with fixed seed)
-- `tightestIndex` points to the pose with minimum clearance in the result
+- Split move increases `poses.length` by 1
+- Merge move decreases `poses.length` by 1 (when valid)
 - With a trivially large stairwell and small box, `fits === true`
+- `tightestIndex` is valid index into `poses`
 
 ---
 
 ## Module: `src/solver/worker.js`
 
-Web Worker entry point. Imports `path.js`, `trajectory.js`, `collision.js`, `box.js`.
+Web Worker entry point. Imports `path.js`, `trajectory.js`, `collision.js`, `box.js`, `stairwell.js`.
 
 ### Message Protocol
 
 **Incoming** (main → worker):
 ```js
-{ type: 'start', stairwellParams, boxDims, n: 100, weights }
+{ type: 'start', stairwellParams, boxDims, weights }
 { type: 'cancel' }
 ```
 
 **Outgoing** (worker → main):
 ```js
-{ type: 'progress', poses, energy, temperature, iteration }  // every 500 iters
-{ type: 'done', fits, poses, tightestIndex, finalEnergy }
-{ type: 'canceled' }
+{ type: 'progress', poses, segmentTimes, totalTime, energy, temperature, iteration }
+{ type: 'done', fits, poses, segmentTimes, totalTime, tightestIndex, finalEnergy }
+{ type: 'canceled', poses, segmentTimes, totalTime }  // best result so far
 ```
 
 ### Behavior
 
 On `start`:
-1. Call `buildStairwell(stairwellParams)` → `collisionQuads`
-2. Call `buildCenterline(stairwellParams)` → centerline
-3. Call `sampleN(centerline, n)` → initial positions
-4. Build `initialPoses`: each sample's `position` as `{x,y,z}`, all angles = 0
-5. Call `optimizeTrajectory(...)` with `onProgress` posting `progress` messages
-6. Post `done` message
+1. `buildStairwell(stairwellParams)` → `collisionQuads`
+2. `buildCenterline(stairwellParams)` → `centerline`
+3. `getHalfExtents(boxDims)` → `halfExtents`
+4. `optimizeTrajectory(collisionQuads, halfExtents, centerline, weights, onProgress)`
+5. Post `done`
 
-On `cancel`: sets a flag checked inside the SA loop; on next progress callback, posts `canceled` and exits.
-
-No unit tests for `worker.js` itself (Web Worker environment not available in Vitest/jsdom). The SA logic is tested via `trajectory.test.js`.
+On `cancel`: sets a cancellation flag. SA checks it every progress callback; posts `canceled` with best-so-far result and exits.
 
 ---
 
@@ -183,31 +227,31 @@ No unit tests for `worker.js` itself (Web Worker environment not available in Vi
 
 ### States
 
-The timeline bar has three states:
-
-**idle** — shown when no solve result exists yet (including after stairwell/box params change):
+**idle**:
 ```
 [ ▶ SOLVE                                                              ]
 ```
 
-**solving** — shown while worker is running:
+**solving**:
 ```
 [ ✕ Cancel    T=2.41   iter 12400 / 50000   [energy bar ████░░░░░░]  ]
 ```
 
-**done** — shown after worker completes or is canceled:
+**done**:
 ```
-[ ↺  ⏮  ▶  [scrubber ●━━━━◆━━━━━━◆━━━━━━━━]  Clear: 8cm   1× ▼ ]
+[ ↺  ⏮  ▶  [scrubber ●━━━━◆━━━━━━◆━━━━━━━━]  0:04 / 0:18   1× ▼ ]
 ```
 
-Keyframe dots on scrubber:
-- Red dot: tightest clearance point (`tightestIndex`)
-- Orange dots: poses where clearance < 5cm
+Scrubber position maps to **real time** (seconds). Keyframe dots:
+- Red: tightest clearance point (`tightestIndex`)
+- Orange: any pose with clearance < 5cm
 
-Result banner rendered above the timeline (inside `#timeline` container):
-- `✓ Box fits!` — green, shown when `fits === true`
-- `~ Best trajectory found — may still collide` — orange, shown when `fits === false` and solve completed
-- `~ Canceled — partial result` — grey, shown when canceled
+Time display shows `elapsed / totalTime` in `m:ss` format.
+
+Result banner above the controls:
+- `✓ Box fits!` — green, `fits === true`
+- `~ Best trajectory found — may still collide` — orange, `fits === false`, solved
+- `~ Canceled — partial result` — grey, canceled
 
 ### API
 
@@ -216,44 +260,35 @@ export function createTimeline(container, callbacks)
 // callbacks: {
 //   onSolve: () => void,
 //   onCancel: () => void,
-//   onPlayheadChange: (t: number) => void,  // t in [0, 1]
+//   onPlayheadChange: (seconds: number) => void,
 // }
 // Returns: {
 //   setState(state: 'idle' | 'solving' | 'done', data?),
-//   updateProgress({ energy, temperature, iteration, maxIter, poses }),
-//   setResult({ fits, tightestIndex, poses }),
-//   updatePlayhead(t: number),   // called by main.js animation loop
+//   updateProgress({ energy, temperature, iteration, maxIter }),
+//   setResult({ fits, tightestIndex, poses, segmentTimes, totalTime }),
+//   updatePlayhead(seconds: number),
 // }
 ```
 
-`setState('idle')`: resets to solve button. Called when stairwell or box dims change (result is stale).
-
-`setState('solving')`: shows progress UI. Called immediately when Solve is clicked.
-
-`setState('done', { fits, tightestIndex, poses })`: shows playback UI + result banner.
-
-`updateProgress(...)`: updates temperature readout, iteration count, energy bar fraction.
-
-`updatePlayhead(t)`: moves scrubber thumb to position `t`. Called from main.js animation loop.
+`onPlayheadChange` receives **seconds** (not t ∈ [0,1]). `main.js` converts seconds to a pose index using `segmentTimes`.
 
 ### Tests
 
-- `createTimeline` returns object with `setState`, `updateProgress`, `setResult`, `updatePlayhead`
-- After `setState('idle')`, container has a button with text matching `/solve/i`
-- After `setState('solving')`, container has a cancel button
-- After `setState('done', { fits: true, ... })`, container includes text matching `/fits/i`
-- After `setState('done', { fits: false, ... })`, container does not include text matching `/✓/`
-- `onSolve` callback fires when solve button is clicked
-- `onCancel` callback fires when cancel button is clicked
+- Returns object with `setState`, `updateProgress`, `setResult`, `updatePlayhead`
+- After `setState('idle')`: button matching `/solve/i` present
+- After `setState('solving')`: cancel button present
+- After `setState('done', { fits: true, ... })`: text matching `/fits/i` present
+- After `setState('done', { fits: false, ... })`: no `✓` in content
+- `onSolve` fires on solve button click
+- `onCancel` fires on cancel button click
 
 ---
 
 ## `src/ui/config-panel.js` Changes
 
-Add `lock()` and `unlock()` methods to the returned object. `lock()` disables all inputs inside the container (sets `input.disabled = true`, `select.disabled = true`). `unlock()` re-enables them. Used by `main.js` during solving.
+Add `lock()` and `unlock()` to the returned object:
 
 ```js
-// Added to return object:
 lock() {
   container.querySelectorAll('input, select').forEach(el => { el.disabled = true; });
 },
@@ -262,19 +297,23 @@ unlock() {
 },
 ```
 
+---
+
 ## `src/solver/collision.js` Changes
 
-In `testOBBvsQuad`: change `return { collides: true, clearance: 0 }` to `return { collides: true, clearance: maxGap }`. The `maxGap` value is negative when colliding (all axes show overlap), giving the signed penetration depth.
+**`testOBBvsQuad`**: change `return { collides: true, clearance: 0 }` to `return { collides: true, clearance: maxGap }`. When all axes show overlap, `maxGap` is negative — its magnitude is the penetration depth on the least-overlapping axis.
 
-In `checkCollisions`: track `minClearance` as the minimum `result.clearance` across all quads (not just non-colliding ones). Remove the `collides ? 0 : minClearance` clamp — return the raw minimum, which will be negative if any quad is penetrating.
+**`checkCollisions`**: return `minClearance` as the minimum `result.clearance` across **all** quads (not clamped — can be negative when any quad is penetrating). Remove the `collides ? 0 : minClearance` guard.
 
-Update `checkCollisions` tests to verify that `minClearance` is negative when the box is penetrating a surface.
+**Tests**: add a test verifying `minClearance < 0` when the box clearly penetrates a surface.
+
+---
 
 ## `index.html` Changes
 
-- `#timeline` div gets `id="timeline"` kept; remove the placeholder text "Timeline (Phase 2)"
-- Add `<div id="result-banner" style="display:none"></div>` inside `#timeline` above the controls
-- Timeline height increases from `60px` to `80px` to fit result banner + controls
+- Remove placeholder text from `#timeline`
+- Add `<div id="result-banner"></div>` as first child of `#timeline`
+- Increase `#timeline` grid row height from `60px` to `80px`
 
 ---
 
@@ -282,74 +321,91 @@ Update `checkCollisions` tests to verify that `minClearance` is negative when th
 
 ### Radians note
 
-Worker-produced poses are already in **radians**. `main.js` passes them directly to `updateBoxMeshPose` — do **not** apply `poseRad()`. The `poseRad()` helper is only for poses coming from the UI config panel (which stores degrees).
+Worker-produced poses are in **radians**. Pass directly to `updateBoxMeshPose` — do **not** apply `poseRad()`.
 
 ### New state variables
+
 ```js
 let currentWorker = null;
-let currentTrajectory = null;   // Pose[] in radians, or null
+let currentTrajectory = null;    // TrajectoryResult or null
 let isPlaying = false;
-let playheadT = 0;
+let playheadSeconds = 0;
 let playSpeed = 1.0;
-let ghostMeshes = [];           // Three.js meshes for ghost trail
+let ghostMeshes = [];            // fixed pool of semi-transparent box meshes
 ```
 
 ### Solve flow
+
 ```js
 function startSolve() {
+  panel.lock();
   timeline.setState('solving');
-  lockConfigPanel(true);
   clearGhostTrail();
 
   currentWorker = new Worker(new URL('./solver/worker.js', import.meta.url), { type: 'module' });
-  currentWorker.onmessage = handleWorkerMessage;
-  currentWorker.postMessage({ type: 'start', stairwellParams: panel.getParams(),
-                               boxDims: currentBoxDims, n: 100 });
-}
-
-function handleWorkerMessage({ data }) {
-  if (data.type === 'progress') {
-    timeline.updateProgress(data);
-    renderGhostTrail(data.poses);  // faded box meshes along trajectory
-  } else if (data.type === 'done' || data.type === 'canceled') {
-    lockConfigPanel(false);
-    currentTrajectory = data.poses ?? null;
-    timeline.setState('done', data);
-  }
+  currentWorker.onmessage = ({ data }) => {
+    if (data.type === 'progress') {
+      timeline.updateProgress(data);
+      renderGhostTrail(data.poses, data.segmentTimes);
+    } else {
+      // 'done' or 'canceled'
+      panel.unlock();
+      currentTrajectory = (data.poses?.length >= 2) ? data : null;
+      timeline.setState('done', data);
+    }
+  };
+  currentWorker.postMessage({ type: 'start',
+    stairwellParams: panel.getParams(), boxDims: currentBoxDims });
 }
 ```
 
 ### Ghost trail
-During solving, render the current-best trajectory as N semi-transparent box meshes (opacity=0.15, no collision color coding). Reuse a fixed pool of N ghost meshes to avoid GC pressure. Only update positions/rotations on each progress message.
+
+Fixed pool of `MAX_GHOST = 20` semi-transparent box meshes (opacity=0.12). On each progress message, subsample `data.poses` down to ≤20 evenly-spaced indices and update the pool's positions/rotations. No GC pressure between progress messages.
 
 ### Playback
+
+`onPlayheadChange(seconds)` converts seconds to a pose index:
+
 ```js
-function onPlayheadChange(t) {
-  playheadT = t;
-  if (!currentTrajectory) return;
-  const idx = Math.round(t * (currentTrajectory.length - 1));
-  const pose = currentTrajectory[idx];
-  updateBoxMeshPose(currentBox, pose);  // pose already in radians from worker
-  updateBoxCollision();
-  timeline.updatePlayhead(t);
+function poseAtTime(trajectory, seconds) {
+  let elapsed = 0;
+  for (let i = 0; i < trajectory.segmentTimes.length; i++) {
+    const dt = trajectory.segmentTimes[i];
+    if (elapsed + dt >= seconds || i === trajectory.segmentTimes.length - 1) {
+      const t = Math.min(1, (seconds - elapsed) / dt);
+      return lerpPose(trajectory.poses[i], trajectory.poses[i + 1], t);
+    }
+    elapsed += dt;
+  }
+  return trajectory.poses[trajectory.poses.length - 1];
 }
 ```
 
-Play/pause animates `playheadT` forward by `playSpeed / fps` each frame in the animation loop.
+`lerpPose`: linear interpolation of x/y/z, linear interpolation of angles (good enough for small steps; no full slerp needed).
+
+Play/pause: each animation frame, if playing, advance `playheadSeconds += playSpeed * deltaTime`, clamp to `[0, totalTime]`, call `onPlayheadChange`.
 
 ### Config change → idle
-When stairwell params or box dims change (and a trajectory exists), call `timeline.setState('idle')` and clear `currentTrajectory`. The result is stale.
+
+When stairwell params or box dims change (and a trajectory exists): `timeline.setState('idle')`, `currentTrajectory = null`, clear ghost trail.
+
+---
+
+## Future Improvement
+
+**Continuous swept-volume collision**: the between-pose sampling is an approximation. A proper swept-volume check (computing the convex hull of two adjacent OBBs and testing it against each quad) would give exact guarantees. This requires a significant rewrite of `collision.js` and is deferred.
 
 ---
 
 ## Verification
 
-1. `npm test` — all tests pass (new: path, trajectory, timeline tests)
-2. `npm run dev` — Solve button appears in timeline bar
-3. Click Solve → parameters lock, solving state shows, ghost trail renders in viewport
-4. Cancel mid-solve → unlocks params, shows partial result
-5. Solve completes → result banner, playback controls, scrubber with keyframe dots
-6. Play → box animates along trajectory
+1. `npm test` — all tests pass
+2. `npm run dev` — Solve button in timeline bar
+3. Click Solve → params lock, solving state, ghost trail appears
+4. Cancel mid-solve → params unlock, partial trajectory shown
+5. Solve completes → result banner, playback controls, scrubber with keyframe dots positioned by real time
+6. Play → box animates, scrubber advances in real time
 7. Click keyframe dot → playhead jumps to tight spot
-8. Change a stairwell param → timeline resets to idle (result cleared)
-9. Test with box obviously too large → `fits: false`, tightest point highlighted
+8. Change stairwell param → timeline resets to idle
+9. Oversized box → `fits: false`, tightest point highlighted
