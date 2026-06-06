@@ -24,9 +24,14 @@ PivotSim is a browser-based 3D tool for simulating moving furniture up staircase
 | `src/geometry/stairwell.js` | `buildStairwell(params)` | Builds Three.js meshes + collision quads from params |
 | `src/geometry/box.js` | `createBoxMesh`, `updateBoxMeshPose`, `computeOBB`, `getOBBCorners`, `getHalfExtents` | Box mesh creation and OBB math (pure, no Three.js in math fns) |
 | `src/solver/collision.js` | `testOBBvsQuad`, `checkCollisions` | SAT collision detection — pure JS, no Three.js dependency |
+| `src/solver/utils.js` | `euclideanDelta`, `angularDelta`, `segmentDuration`, `lerpPose`, `applyRotationPropagation`, `MAX_LINEAR_SPEED`, `MAX_ANGULAR_SPEED` | Pure pose-math shared across all planners |
+| `src/solver/path.js` | `buildCenterline`, `getEndpoints`, `buildContainmentOBBs` | Builds stairwell centerline polyline and containment OBBs for trajectory solver |
+| `src/solver/trajectory.js` | `optimizeTrajectory`, `evalSegment`, `DEFAULT_WEIGHTS` | Trajectory optimizer — simulated-annealing over 6-DOF box poses |
+| `src/solver/worker.js` | — | Web Worker wrapper for `optimizeTrajectory`; accepts `start`/`cancel` messages |
 | `src/viewer/scene.js` | `createScene(container)` | Sets up Three.js scene, camera, renderer, OrbitControls |
 | `src/viewer/debug.js` | `buildQuadDebug(quads)` | Builds colored wireframe + normal arrows for collision quad visualization |
 | `src/ui/config-panel.js` | `createConfigPanel(container, params, onChange)` | Renders all parameter inputs, debounced onChange |
+| `src/ui/timeline.js` | `createTimeline(container, callbacks)` | Timeline UI: solve trigger, playback controls, scrubber |
 | `src/main.js` | — | Entry point: wires everything together |
 
 **OBB format** (used by collision solver):
@@ -52,7 +57,7 @@ Types: `tread`, `riser`, `wall-left`, `wall-right`, `ceiling`, `floor`
 ## Phased Roadmap
 
 - **Phase 0+1** ✅ — Scaffold + stairwell geometry visualizer
-- **Phase 1.5** ✅ — Box model (`src/geometry/box.js`) + SAT collision detector (`src/solver/collision.js`); manual box placement with real-time collision feedback (current)
-- **Phase 2** — Trajectory solver (`src/solver/trajectory.js`) + timeline UI (`src/ui/timeline.js`)
+- **Phase 1.5** ✅ — Box model (`src/geometry/box.js`) + SAT collision detector (`src/solver/collision.js`); manual box placement with real-time collision feedback
+- **Phase 2** ✅ — Trajectory solver (`src/solver/trajectory.js`) + timeline UI (`src/ui/timeline.js`)
 
 Full spec: `docs/superpowers/specs/2026-06-05-pivotsim-design.md`
