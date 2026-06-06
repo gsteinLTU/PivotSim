@@ -8,7 +8,7 @@ const DOFS = ['x', 'y', 'z', 'yaw', 'pitch', 'roll'];
 const SIGMA = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.3, pitch: 0.2, roll: 0.2 };
 
 export const DEFAULT_WEIGHTS = {
-  w_col: 100, w_clr: 0.5, w_rot: 0.5, w_pos: 0.5, w_time: 1, w_void: 100, w_nk: 2,
+  w_col: 100, w_clr: 1.5, w_rot: 0.45, w_pos: 0.45, w_time: 0.5, w_void: 150, w_nk: 2,
 };
 
 // ── Pure math helpers ──────────────────────────────────────────────────────
