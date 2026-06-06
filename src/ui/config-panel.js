@@ -11,6 +11,27 @@ export function fromMeters(value, unit) {
   return value / TO_METERS[unit];
 }
 
+const LS_KEY = 'pivotsim_unit_prefs';
+const VALID_UNITS = new Set(['m', 'ft', 'in']);
+
+export function loadUnitPrefs(validKeys) {
+  let stored = {};
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    const parsed = JSON.parse(raw || '{}');
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      stored = parsed;
+    }
+  } catch {
+    // bad JSON — use empty object, all keys fall back to 'm'
+  }
+  const prefs = {};
+  for (const key of validKeys) {
+    prefs[key] = VALID_UNITS.has(stored[key]) ? stored[key] : 'm';
+  }
+  return prefs;
+}
+
 const FIELD_DEFS = [
   { key: 'stairWidth', label: 'Stair Width (m)', type: 'number', min: 0.5, max: 3, step: 0.05 },
   { key: 'numSteps', label: 'Number of Steps', type: 'number', min: 1, max: 30, step: 1 },

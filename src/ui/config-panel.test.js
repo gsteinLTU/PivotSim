@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { createConfigPanel, toMeters, fromMeters } from './config-panel.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createConfigPanel, toMeters, fromMeters, loadUnitPrefs } from './config-panel.js';
 import { DEFAULTS, BOX_DEFAULTS, BOX_POSE_DEFAULTS } from '../defaults.js';
 
 describe('createConfigPanel', () => {
@@ -153,5 +153,51 @@ describe('fromMeters', () => {
   });
   it('round-trips m → in → m', () => {
     expect(toMeters(fromMeters(1.2, 'in'), 'in')).toBeCloseTo(1.2);
+  });
+});
+
+describe('loadUnitPrefs', () => {
+  const KEYS = ['stairWidth', 'risePerStep', 'x'];
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('returns "m" for all keys when localStorage is empty', () => {
+    const prefs = loadUnitPrefs(KEYS);
+    expect(prefs).toEqual({ stairWidth: 'm', risePerStep: 'm', x: 'm' });
+  });
+
+  it('returns stored valid unit values', () => {
+    localStorage.setItem('pivotsim_unit_prefs', JSON.stringify({ stairWidth: 'in', risePerStep: 'ft', x: 'm' }));
+    const prefs = loadUnitPrefs(KEYS);
+    expect(prefs).toEqual({ stairWidth: 'in', risePerStep: 'ft', x: 'm' });
+  });
+
+  it('falls back to "m" for unknown unit values', () => {
+    localStorage.setItem('pivotsim_unit_prefs', JSON.stringify({ stairWidth: 'cm', risePerStep: 'yards' }));
+    const prefs = loadUnitPrefs(KEYS);
+    expect(prefs.stairWidth).toBe('m');
+    expect(prefs.risePerStep).toBe('m');
+  });
+
+  it('falls back to "m" for missing keys', () => {
+    localStorage.setItem('pivotsim_unit_prefs', JSON.stringify({ stairWidth: 'in' }));
+    const prefs = loadUnitPrefs(KEYS);
+    expect(prefs.risePerStep).toBe('m');
+    expect(prefs.x).toBe('m');
+  });
+
+  it('ignores unknown keys in stored data', () => {
+    localStorage.setItem('pivotsim_unit_prefs', JSON.stringify({ unknownField: 'in' }));
+    const prefs = loadUnitPrefs(KEYS);
+    expect(prefs).not.toHaveProperty('unknownField');
+    expect(prefs.stairWidth).toBe('m');
+  });
+
+  it('falls back to all "m" when localStorage contains invalid JSON', () => {
+    localStorage.setItem('pivotsim_unit_prefs', 'not-json{{{');
+    const prefs = loadUnitPrefs(KEYS);
+    expect(prefs).toEqual({ stairWidth: 'm', risePerStep: 'm', x: 'm' });
   });
 });
