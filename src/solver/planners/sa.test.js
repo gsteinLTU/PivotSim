@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { saPlanner, evalSegment, DEFAULT_WEIGHTS } from './sa.js';
+import { saPlanner, evalSegment } from './sa.js';
 
 // ── Shared fixtures ────────────────────────────────────────────────────────
 
