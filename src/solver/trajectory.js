@@ -133,10 +133,23 @@ export async function optimizeTrajectory(
   const BATCH    = 500;
 
   const { start, end } = getEndpoints(centerline);
+  const { points } = centerline;
+
+  // Pull endpoints inward (toward the stairs) by half the box length + 5 cm padding
+  // so the box starts fully inside the hallway rather than centered on the end wall.
+  const ENDPOINT_PAD = 0.05;
+  const inset = halfExtents[2] + ENDPOINT_PAD;
+  function insetPoint(pt, toward) {
+    const dx = toward[0] - pt[0], dy = toward[1] - pt[1], dz = toward[2] - pt[2];
+    const len = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
+    return [pt[0] + dx/len * inset, pt[1] + dy/len * inset, pt[2] + dz/len * inset];
+  }
+  const startPt = insetPoint(start, points[1]);
+  const endPt   = insetPoint(end,   points[points.length - 2]);
 
   // Endpoints fixed; y lifted by halfExtents[1] so box sits on floor
-  const startPose = { x: start[0], y: start[1] + halfExtents[1], z: start[2], yaw: 0, pitch: 0, roll: 0 };
-  const endPose   = { x: end[0],   y: end[1]   + halfExtents[1], z: end[2],   yaw: 0, pitch: 0, roll: 0 };
+  const startPose = { x: startPt[0], y: startPt[1] + halfExtents[1], z: startPt[2], yaw: 0, pitch: 0, roll: 0 };
+  const endPose   = { x: endPt[0],   y: endPt[1]   + halfExtents[1], z: endPt[2],   yaw: 0, pitch: 0, roll: 0 };
 
   let poses   = [startPose, endPose];
   let segData = [evalSegment(startPose, endPose, collisionQuads, halfExtents)];
