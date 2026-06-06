@@ -106,4 +106,22 @@ describe('createConfigPanel', () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(cb).toHaveBeenCalledWith(expect.objectContaining({ length: 1.5 }));
   });
+
+  it('lock() disables all inputs and selects', () => {
+    const container = document.createElement('div');
+    const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    panel.lock();
+    const inputs = Array.from(container.querySelectorAll('input, select'));
+    expect(inputs.length).toBeGreaterThan(0);
+    expect(inputs.every(el => el.disabled)).toBe(true);
+  });
+
+  it('unlock() re-enables all inputs and selects', () => {
+    const container = document.createElement('div');
+    const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    panel.lock();
+    panel.unlock();
+    const inputs = Array.from(container.querySelectorAll('input, select'));
+    expect(inputs.every(el => !el.disabled)).toBe(true);
+  });
 });

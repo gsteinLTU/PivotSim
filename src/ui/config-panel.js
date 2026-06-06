@@ -219,5 +219,11 @@ export function createConfigPanel(container, initialParams, onChange) {
     onBoxPoseChange(callback) {
       boxPoseCallback = callback;
     },
+    lock() {
+      container.querySelectorAll('input, select').forEach((el) => { el.disabled = true; });
+    },
+    unlock() {
+      container.querySelectorAll('input, select').forEach((el) => { el.disabled = false; });
+    },
   };
 }
