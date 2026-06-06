@@ -5,6 +5,7 @@ export const MAX_LINEAR_SPEED  = 0.5;   // m/s
 export const MAX_ANGULAR_SPEED = 0.5;   // rad/s
 const CLEARANCE_CAP = 0.3;              // m — clearance reward capped here
 const DOFS = ['x', 'y', 'z', 'yaw', 'pitch', 'roll'];
+const ROTATION_DOFS = ['yaw', 'pitch', 'roll'];
 const SIGMA = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.3, pitch: 0.2, roll: 0.2 };
 
 export const DEFAULT_WEIGHTS = {
@@ -263,8 +264,8 @@ export async function optimizeTrajectory(
     const r = Math.random();
     let newPoses, newSegData, newEnergy;
 
-    if (r < 0.7 && poses.length > 2) {
-      // ── Perturb ──────────────────────────────────────────────────────────
+    if (r < 0.55 && poses.length > 2) {
+      // ── Point perturb ────────────────────────────────────────────────────
       const i   = 1 + Math.floor(Math.random() * (poses.length - 2));
       const dof = DOFS[Math.floor(Math.random() * 6)];
       newPoses   = poses.map(p => ({ ...p }));
@@ -274,8 +275,34 @@ export async function optimizeTrajectory(
       newSegData[i]     = evalSegment(newPoses[i],     newPoses[i + 1], collisionQuads, halfExtents, obbs);
       newEnergy = totalEnergy(newSegData, newPoses, w);
 
-    } else if (r < 0.9 || poses.length <= 2) {
-      // ── Split (also used as fallback when merge is impossible) ────────────
+    } else if (r < 0.65 && poses.length > 2) {
+      // ── Forward propagate ────────────────────────────────────────────────
+      // Shift poses[i..n-2] by same delta on one rotation DOF.
+      // Only two boundary segments change: [i-1] and [n-2].
+      const i    = 1 + Math.floor(Math.random() * (poses.length - 2));
+      const dof  = ROTATION_DOFS[Math.floor(Math.random() * 3)];
+      const delta = randn() * SIGMA[dof] * T;
+      newPoses   = applyRotationPropagation(poses, i, poses.length - 1, dof, delta);
+      newSegData  = segData.slice();
+      const lastInterior = poses.length - 2;
+      newSegData[i - 1]        = evalSegment(newPoses[i - 1], newPoses[i],                        collisionQuads, halfExtents, obbs);
+      newSegData[lastInterior] = evalSegment(newPoses[lastInterior], newPoses[lastInterior + 1],   collisionQuads, halfExtents, obbs);
+      newEnergy = totalEnergy(newSegData, newPoses, w);
+
+    } else if (r < 0.75 && poses.length > 2) {
+      // ── Backward propagate ───────────────────────────────────────────────
+      // Shift poses[1..i] by same delta on one rotation DOF.
+      // Only two boundary segments change: [0] and [i].
+      const i    = 1 + Math.floor(Math.random() * (poses.length - 2));
+      const dof  = ROTATION_DOFS[Math.floor(Math.random() * 3)];
+      const delta = randn() * SIGMA[dof] * T;
+      newPoses   = applyRotationPropagation(poses, 1, i + 1, dof, delta);
+      newSegData  = segData.slice();
+      newSegData[0] = evalSegment(newPoses[0], newPoses[1],           collisionQuads, halfExtents, obbs);
+      newSegData[i] = evalSegment(newPoses[i], newPoses[i + 1],       collisionQuads, halfExtents, obbs);
+      newEnergy = totalEnergy(newSegData, newPoses, w);
+
+    } else if (r < 0.90 || poses.length <= 2) {
       // ── Split ─────────────────────────────────────────────────────────────
       // Primary: highest collision energy. Tiebreak: longest segment.
       // Without the tiebreak, all splits target index 0 when nothing is colliding,
