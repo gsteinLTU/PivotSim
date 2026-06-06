@@ -96,13 +96,14 @@ describe('evalSegment', () => {
 const openCenterline = {
   points: [[0, 0, -5], [0, 0, 5]],
   totalLength: 10,
+  ceilingHeight: 2.4,
 };
 
 describe('optimizeTrajectory', () => {
   it('returns a TrajectoryResult with correct shape', async () => {
     const result = await optimizeTrajectory(
       openQuads, tinyHalf, openCenterline,
-      { maxIter: 100 }, null, null
+      null, { maxIter: 100 }, null, null
     );
     expect(Array.isArray(result.poses)).toBe(true);
     expect(result.poses.length).toBeGreaterThanOrEqual(2);
@@ -117,7 +118,7 @@ describe('optimizeTrajectory', () => {
   it('totalTime equals sum of segmentTimes', async () => {
     const result = await optimizeTrajectory(
       openQuads, tinyHalf, openCenterline,
-      { maxIter: 50 }, null, null
+      null, { maxIter: 50 }, null, null
     );
     const sum = result.segmentTimes.reduce((a, b) => a + b, 0);
     expect(result.totalTime).toBeCloseTo(sum, 5);
@@ -126,7 +127,7 @@ describe('optimizeTrajectory', () => {
   it('fits === true immediately for an open space with a tiny box', async () => {
     const result = await optimizeTrajectory(
       openQuads, tinyHalf, openCenterline,
-      { maxIter: 10 }, null, null
+      null, { maxIter: 10 }, null, null
     );
     // Start/end are at y=0.05 (half-height above floor), path is in open space → fits immediately
     expect(result.fits).toBe(true);
@@ -136,7 +137,7 @@ describe('optimizeTrajectory', () => {
     const calls = [];
     await optimizeTrajectory(
       openQuads, tinyHalf, openCenterline,
-      { maxIter: 600 },
+      null, { maxIter: 600 },
       (p) => calls.push(p),
       null
     );
@@ -152,7 +153,7 @@ describe('optimizeTrajectory', () => {
     let callCount = 0;
     const result = await optimizeTrajectory(
       openQuads, tinyHalf, openCenterline,
-      { maxIter: 50000 },
+      null, { maxIter: 50000 },
       () => { callCount++; },
       () => callCount >= 1   // cancel after first progress callback
     );

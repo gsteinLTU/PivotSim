@@ -8,7 +8,7 @@ const DOFS = ['x', 'y', 'z', 'yaw', 'pitch', 'roll'];
 const SIGMA = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.3, pitch: 0.2, roll: 0.2 };
 
 export const DEFAULT_WEIGHTS = {
-  w_col: 100, w_clr: 1, w_rot: 0.1, w_pos: 0.5, w_time: 0.01,
+  w_col: 100, w_clr: 0.5, w_rot: 0.5, w_pos: 0.5, w_time: 1, w_void: 100, w_nk: 2,
 };
 
 // ── Pure math helpers ──────────────────────────────────────────────────────
@@ -18,8 +18,18 @@ export function euclideanDelta(a, b) {
   return Math.sqrt(dx*dx + dy*dy + dz*dz);
 }
 
+// Shortest signed angular difference, result in (−π, π]
+function angleDiff(from, to) {
+  let d = (to - from) % (2 * Math.PI);
+  if (d >  Math.PI) d -= 2 * Math.PI;
+  if (d < -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
 export function angularDelta(a, b) {
-  return Math.abs(b.yaw - a.yaw) + Math.abs(b.pitch - a.pitch) + Math.abs(b.roll - a.roll);
+  return Math.abs(angleDiff(a.yaw, b.yaw))
+       + Math.abs(angleDiff(a.pitch, b.pitch))
+       + Math.abs(angleDiff(a.roll, b.roll));
 }
 
 export function segmentDuration(a, b) {
@@ -34,9 +44,9 @@ export function lerpPose(a, b, t) {
     x:     a.x     + (b.x     - a.x)     * t,
     y:     a.y     + (b.y     - a.y)     * t,
     z:     a.z     + (b.z     - a.z)     * t,
-    yaw:   a.yaw   + (b.yaw   - a.yaw)   * t,
-    pitch: a.pitch + (b.pitch - a.pitch) * t,
-    roll:  a.roll  + (b.roll  - a.roll)  * t,
+    yaw:   a.yaw   + angleDiff(a.yaw,   b.yaw)   * t,
+    pitch: a.pitch + angleDiff(a.pitch, b.pitch) * t,
+    roll:  a.roll  + angleDiff(a.roll,  b.roll)  * t,
   };
 }
 
@@ -63,24 +73,57 @@ function randn() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
+// ── Containment check ──────────────────────────────────────────────────────
+
+/**
+ * Returns the "excess" outside the nearest OBB (positive = outside all OBBs).
+ * Each OBB: { center: [x,y,z], axes: [[…],[…],[…]], halfExtents: [hx,hy,hz] }
+ */
+function signedDistFromOBBs(px, py, pz, obbs) {
+  let best = Infinity;
+  for (const obb of obbs) {
+    const dx = px - obb.center[0], dy = py - obb.center[1], dz = pz - obb.center[2];
+    let maxExcess = -Infinity;
+    for (let i = 0; i < 3; i++) {
+      const ax = obb.axes[i];
+      const proj = Math.abs(dx * ax[0] + dy * ax[1] + dz * ax[2]);
+      const excess = proj - obb.halfExtents[i];
+      if (excess > maxExcess) maxExcess = excess;
+    }
+    if (maxExcess < best) best = maxExcess; // most-inside OBB
+  }
+  return best; // ≤ 0 = inside at least one OBB; > 0 = outside all, distance ≈ best
+}
+
 // ── Segment energy ─────────────────────────────────────────────────────────
 
 /**
- * Evaluates collision and clearance energy for one segment (a → b).
- * Returns { collEnergy, clrEnergy, duration }
+ * Evaluates collision, clearance, and void energy for one segment (a → b).
+ * containmentOBBs: optional array of OBBs from buildContainmentOBBs; samples
+ *   outside all OBBs accumulate voidEnergy (excess² per sample, time-proportional
+ *   since K scales with duration).
+ * Returns { collEnergy, clrEnergy, voidEnergy, duration }
  */
-export function evalSegment(a, b, collisionQuads, halfExtents) {
-  const dur = segmentDuration(a, b);
-  const K = Math.max(5, Math.ceil(dur / 0.2));
+export function evalSegment(a, b, collisionQuads, halfExtents, containmentOBBs) {
+  const dur  = segmentDuration(a, b);
+  const dist = euclideanDelta(a, b);
+  const K = Math.max(5, Math.ceil(dur / 0.2), Math.ceil(dist / 0.05));
 
   // First pass: K evenly-spaced samples
   let worstC = Infinity, worstT = 0.5;
   const clearances = [];
+  let voidEnergy = 0;
   for (let k = 0; k < K; k++) {
     const t = (k + 0.5) / K;
-    const { minClearance } = checkCollisions(computeOBB(lerpPose(a, b, t), halfExtents), collisionQuads);
+    const pose = lerpPose(a, b, t);
+    const { minClearance } = checkCollisions(computeOBB(pose, halfExtents), collisionQuads);
     clearances.push(minClearance);
     if (minClearance < worstC) { worstC = minClearance; worstT = t; }
+
+    if (containmentOBBs?.length) {
+      const excess = signedDistFromOBBs(pose.x, pose.y, pose.z, containmentOBBs);
+      if (excess > 0) voidEnergy += excess * excess;
+    }
   }
 
   // Second pass: 10 refined samples around the worst point (±halfSpacing in 5 steps)
@@ -98,7 +141,7 @@ export function evalSegment(a, b, collisionQuads, halfExtents) {
     if (c < 0) collEnergy += c * c;  // (-c)² = c² since c < 0
     else        clrEnergy += Math.min(c, CLEARANCE_CAP);
   }
-  return { collEnergy, clrEnergy, duration: dur };
+  return { collEnergy, clrEnergy, voidEnergy, duration: dur };
 }
 
 function totalEnergy(segData, poses, w) {
@@ -106,10 +149,14 @@ function totalEnergy(segData, poses, w) {
   for (let i = 0; i < segData.length; i++) {
     E += w.w_col  * segData[i].collEnergy;
     E -= w.w_clr  * segData[i].clrEnergy;
+    E += w.w_void * (segData[i].voidEnergy ?? 0);
     E += w.w_rot  * angularDelta(poses[i], poses[i + 1]);
     E += w.w_pos  * euclideanDelta(poses[i], poses[i + 1]);
     E += w.w_time * segData[i].duration;
   }
+  // Per-keypoint cost: each interior point must earn its place by reducing
+  // collision/void energy by at least w_nk, preventing fidgety accumulation.
+  E += w.w_nk * (poses.length - 2);
   return E;
 }
 
@@ -117,42 +164,77 @@ function totalEnergy(segData, poses, w) {
 
 /**
  * Runs simulated annealing to find a collision-free trajectory.
- * @param {object[]} collisionQuads  from buildStairwell
- * @param {number[]} halfExtents     [hW, hH, hL] from getHalfExtents
- * @param {object}   centerline      from buildCenterline
- * @param {object}   weights         SA weights + optional maxIter override
- * @param {function} onProgress      called every 500 iters with current best
- * @param {function} shouldCancel    returns true to stop early
+ * @param {object[]} collisionQuads   from buildStairwell
+ * @param {number[]} halfExtents      [hW, hH, hL] from getHalfExtents
+ * @param {object}   centerline       from buildCenterline
+ * @param {object[]|null} containmentOBBs  from buildContainmentOBBs; null disables void penalty
+ * @param {object}   weights          SA weights + optional maxIter override
+ * @param {function} onProgress       called every 500 iters with current best
+ * @param {function} shouldCancel     returns true to stop early
  * @returns {Promise<TrajectoryResult>}
  */
 export async function optimizeTrajectory(
-  collisionQuads, halfExtents, centerline, weights, onProgress, shouldCancel,
+  collisionQuads, halfExtents, centerline, containmentOBBs, weights, onProgress, shouldCancel,
 ) {
   const w = { ...DEFAULT_WEIGHTS, ...(weights ?? {}) };
   const MAX_ITER = weights?.maxIter ?? 50000;
+  const obbs = containmentOBBs ?? [];
   const BATCH    = 500;
 
   const { start, end } = getEndpoints(centerline);
   const { points } = centerline;
 
-  // Pull endpoints inward (toward the stairs) by half the box length + 5 cm padding
-  // so the box starts fully inside the hallway rather than centered on the end wall.
-  const ENDPOINT_PAD = 0.05;
-  const inset = halfExtents[2] + ENDPOINT_PAD;
-  function insetPoint(pt, toward) {
-    const dx = toward[0] - pt[0], dy = toward[1] - pt[1], dz = toward[2] - pt[2];
-    const len = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1;
-    return [pt[0] + dx/len * inset, pt[1] + dy/len * inset, pt[2] + dz/len * inset];
+  // Place start/end at hallway midpoint so the box begins fully inside.
+  function midpoint(a, b) {
+    return [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2];
   }
-  const startPt = insetPoint(start, points[1]);
-  const endPt   = insetPoint(end,   points[points.length - 2]);
+  const startPt = midpoint(points[0], points[1]);
+  const endPt   = midpoint(points[points.length - 1], points[points.length - 2]);
 
-  // Endpoints fixed; y lifted by halfExtents[1] so box sits on floor
-  const startPose = { x: startPt[0], y: startPt[1] + halfExtents[1], z: startPt[2], yaw: 0, pitch: 0, roll: 0 };
-  const endPose   = { x: endPt[0],   y: endPt[1]   + halfExtents[1], z: endPt[2],   yaw: 0, pitch: 0, roll: 0 };
+  // Endpoints centered vertically in the hallway (floor + ceiling midpoint)
+  const halfCeil = centerline.ceilingHeight / 2;
+  const startPose = { x: startPt[0], y: startPt[1] + halfCeil, z: startPt[2], yaw: 0, pitch: 0, roll: 0 };
+  const endPose   = { x: endPt[0],   y: endPt[1]   + halfCeil, z: endPt[2],   yaw: 0, pitch: 0, roll: 0 };
 
-  let poses   = [startPose, endPose];
-  let segData = [evalSegment(startPose, endPose, collisionQuads, halfExtents)];
+  // Seed keypoints at stair junctions and flight midpoint so the path is
+  // threaded through the stairwell from the start rather than needing SA to find it.
+  const n = points.length;
+  function poseAt(pt) {
+    return { x: pt[0], y: pt[1] + halfCeil, z: pt[2], yaw: 0, pitch: 0, roll: 0 };
+  }
+  const stairBasePose = poseAt(points[1]);           // bottom stair junction
+  const stairMidPt    = points[Math.floor(n / 2)];
+  const midPose       = poseAt(stairMidPt);          // stair flight midpoint
+  const stairTopPose  = poseAt(points[n - 2]);       // top stair junction
+
+  // Bounding box of all collision quad vertices — perturbed poses are clamped
+  // to this region so they can't escape to void space with zero collision energy.
+  let bxMin = Infinity, bxMax = -Infinity;
+  let byMin = Infinity, byMax = -Infinity;
+  let bzMin = Infinity, bzMax = -Infinity;
+  for (const quad of collisionQuads) {
+    for (const [x, y, z] of quad.vertices) {
+      if (x < bxMin) bxMin = x; if (x > bxMax) bxMax = x;
+      if (y < byMin) byMin = y; if (y > byMax) byMax = y;
+      if (z < bzMin) bzMin = z; if (z > bzMax) bzMax = z;
+    }
+  }
+  function clampPose(p) {
+    return {
+      ...p,
+      x: Math.max(bxMin, Math.min(bxMax, p.x)),
+      y: Math.max(byMin, Math.min(byMax, p.y)),
+      z: Math.max(bzMin, Math.min(bzMax, p.z)),
+    };
+  }
+
+  let poses   = [startPose, stairBasePose, midPose, stairTopPose, endPose];
+  let segData = [
+    evalSegment(startPose,   stairBasePose, collisionQuads, halfExtents, obbs),
+    evalSegment(stairBasePose, midPose,     collisionQuads, halfExtents, obbs),
+    evalSegment(midPose,     stairTopPose,  collisionQuads, halfExtents, obbs),
+    evalSegment(stairTopPose, endPose,      collisionQuads, halfExtents, obbs),
+  ];
   let energy  = totalEnergy(segData, poses, w);
 
   let bestPoses   = poses.map(p => ({ ...p }));
@@ -175,21 +257,26 @@ export async function optimizeTrajectory(
       const i   = 1 + Math.floor(Math.random() * (poses.length - 2));
       const dof = DOFS[Math.floor(Math.random() * 6)];
       newPoses   = poses.map(p => ({ ...p }));
-      newPoses[i] = { ...poses[i], [dof]: poses[i][dof] + randn() * SIGMA[dof] * T };
+      newPoses[i] = clampPose({ ...poses[i], [dof]: poses[i][dof] + randn() * SIGMA[dof] * T });
       newSegData  = segData.slice();
-      newSegData[i - 1] = evalSegment(newPoses[i - 1], newPoses[i],     collisionQuads, halfExtents);
-      newSegData[i]     = evalSegment(newPoses[i],     newPoses[i + 1], collisionQuads, halfExtents);
+      newSegData[i - 1] = evalSegment(newPoses[i - 1], newPoses[i],     collisionQuads, halfExtents, obbs);
+      newSegData[i]     = evalSegment(newPoses[i],     newPoses[i + 1], collisionQuads, halfExtents, obbs);
       newEnergy = totalEnergy(newSegData, newPoses, w);
 
     } else if (r < 0.9 || poses.length <= 2) {
       // ── Split (also used as fallback when merge is impossible) ────────────
       // ── Split ─────────────────────────────────────────────────────────────
+      // Primary: highest collision energy. Tiebreak: longest segment.
+      // Without the tiebreak, all splits target index 0 when nothing is colliding,
+      // piling keypoints in the first (hallway) segment.
       let worstIdx = 0;
       for (let i = 1; i < segData.length; i++) {
-        if (segData[i].collEnergy > segData[worstIdx].collEnergy) worstIdx = i;
+        const ci = segData[i].collEnergy, c0 = segData[worstIdx].collEnergy;
+        if (ci > c0 || (ci === c0 && segData[i].duration > segData[worstIdx].duration)) worstIdx = i;
       }
-      const mid = lerpPose(poses[worstIdx], poses[worstIdx + 1], 0.5);
+      let mid = lerpPose(poses[worstIdx], poses[worstIdx + 1], 0.5);
       for (const dof of DOFS) mid[dof] += randn() * SIGMA[dof] * T * 0.5;
+      mid = clampPose(mid);
 
       newPoses = [
         ...poses.slice(0, worstIdx + 1),
@@ -198,8 +285,8 @@ export async function optimizeTrajectory(
       ];
       newSegData = [
         ...segData.slice(0, worstIdx),
-        evalSegment(newPoses[worstIdx],     mid,                    collisionQuads, halfExtents),
-        evalSegment(mid,                    newPoses[worstIdx + 2], collisionQuads, halfExtents),
+        evalSegment(newPoses[worstIdx],     mid,                    collisionQuads, halfExtents, obbs),
+        evalSegment(mid,                    newPoses[worstIdx + 2], collisionQuads, halfExtents, obbs),
         ...segData.slice(worstIdx + 1),
       ];
       newEnergy = totalEnergy(newSegData, newPoses, w);
@@ -210,7 +297,7 @@ export async function optimizeTrajectory(
       newPoses = [...poses.slice(0, i), ...poses.slice(i + 1)];
       newSegData = [
         ...segData.slice(0, i - 1),
-        evalSegment(newPoses[i - 1], newPoses[i], collisionQuads, halfExtents),
+        evalSegment(newPoses[i - 1], newPoses[i], collisionQuads, halfExtents, obbs),
         ...segData.slice(i + 1),
       ];
       newEnergy = totalEnergy(newSegData, newPoses, w);

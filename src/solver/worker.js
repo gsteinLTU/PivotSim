@@ -1,6 +1,6 @@
 import { buildStairwell } from '../geometry/stairwell.js';
 import { getHalfExtents } from '../geometry/box.js';
-import { buildCenterline } from './path.js';
+import { buildCenterline, buildContainmentOBBs } from './path.js';
 import { optimizeTrajectory } from './trajectory.js';
 
 let cancelFlag = false;
@@ -18,11 +18,13 @@ self.onmessage = async ({ data }) => {
       const { collisionQuads } = buildStairwell(stairwellParams);
       const halfExtents        = getHalfExtents(boxDims);
       const centerline         = buildCenterline(stairwellParams);
+      const containmentOBBs    = buildContainmentOBBs(centerline, stairwellParams);
 
       const result = await optimizeTrajectory(
         collisionQuads,
         halfExtents,
         centerline,
+        containmentOBBs,
         weights,
         (progress) => {
           self.postMessage({ type: 'progress', ...progress });

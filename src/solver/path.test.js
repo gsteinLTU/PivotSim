@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCenterline, getEndpoints } from './path.js';
+import { buildCenterline, getEndpoints, buildContainmentOBBs } from './path.js';
 import { DEFAULTS } from '../defaults.js';
 
 describe('buildCenterline', () => {
@@ -17,10 +17,11 @@ describe('buildCenterline', () => {
   it('first point is in the bottom hallway (near hallway end)', () => {
     const cl = buildCenterline(DEFAULTS);
     const start = cl.points[0];
-    // btRad=90°: start should be near [hallwayLength, 0, 0]
-    expect(start[0]).toBeCloseTo(DEFAULTS.hallwayLength, 3);
+    // btRad=90°, with stairHalfW/btHalfW offsets:
+    //   x = L - stairHalfW, z = -btHalfW
+    expect(start[0]).toBeCloseTo(DEFAULTS.hallwayLength - DEFAULTS.stairWidth / 2, 3);
     expect(start[1]).toBeCloseTo(0, 3);
-    expect(start[2]).toBeCloseTo(0, 3);
+    expect(start[2]).toBeCloseTo(-DEFAULTS.bottomHallwayWidth / 2, 3);
   });
 
   it('last point is in the top hallway', () => {
@@ -55,5 +56,53 @@ describe('getEndpoints', () => {
     const { start, end } = getEndpoints(cl);
     expect(start).toEqual(cl.points[0]);
     expect(end).toEqual(cl.points[cl.points.length - 1]);
+  });
+});
+
+describe('buildContainmentOBBs', () => {
+  it('returns 3 OBBs with center, axes, halfExtents', () => {
+    const cl = buildCenterline(DEFAULTS);
+    const obbs = buildContainmentOBBs(cl, DEFAULTS);
+    expect(obbs).toHaveLength(3);
+    for (const obb of obbs) {
+      expect(obb).toHaveProperty('center');
+      expect(obb).toHaveProperty('axes');
+      expect(obb).toHaveProperty('halfExtents');
+      expect(obb.center).toHaveLength(3);
+      expect(obb.axes).toHaveLength(3);
+      expect(obb.halfExtents).toHaveLength(3);
+      expect(obb.halfExtents.every(h => h > 0)).toBe(true);
+    }
+  });
+
+  it('start pose center is inside bottom hallway OBB', () => {
+    const cl = buildCenterline(DEFAULTS);
+    const obbs = buildContainmentOBBs(cl, DEFAULTS);
+    // startPt = midpoint(points[0], points[1]), y = ceilingHeight/2
+    const pts = cl.points;
+    const sx = (pts[0][0] + pts[1][0]) / 2;
+    const sy = DEFAULTS.ceilingHeight / 2;
+    const sz = (pts[0][2] + pts[1][2]) / 2;
+    const inside = obbs.some(obb => {
+      const dx = sx - obb.center[0], dy = sy - obb.center[1], dz = sz - obb.center[2];
+      return obb.axes.every((ax, i) =>
+        Math.abs(dx * ax[0] + dy * ax[1] + dz * ax[2]) <= obb.halfExtents[i]
+      );
+    });
+    expect(inside).toBe(true);
+  });
+
+  it('clearly void point is outside all OBBs', () => {
+    const cl = buildCenterline(DEFAULTS);
+    const obbs = buildContainmentOBBs(cl, DEFAULTS);
+    // Far outside in X — no part of the stairwell extends to x=20
+    const [px, py, pz] = [20, 1.2, 0];
+    const inside = obbs.some(obb => {
+      const dx = px - obb.center[0], dy = py - obb.center[1], dz = pz - obb.center[2];
+      return obb.axes.every((ax, i) =>
+        Math.abs(dx * ax[0] + dy * ax[1] + dz * ax[2]) <= obb.halfExtents[i]
+      );
+    });
+    expect(inside).toBe(false);
   });
 });
