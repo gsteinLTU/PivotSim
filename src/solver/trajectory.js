@@ -278,28 +278,30 @@ export async function optimizeTrajectory(
     } else if (r < 0.65 && poses.length > 2) {
       // ── Forward propagate ────────────────────────────────────────────────
       // Shift poses[i..n-2] by same delta on one rotation DOF.
-      // Only two boundary segments change: [i-1] and [n-2].
+      // All segments from [i-1] through [lastInterior] are affected by the rotation.
       const i    = 1 + Math.floor(Math.random() * (poses.length - 2));
       const dof  = ROTATION_DOFS[Math.floor(Math.random() * 3)];
       const delta = randn() * SIGMA[dof] * T;
       newPoses   = applyRotationPropagation(poses, i, poses.length - 1, dof, delta);
       newSegData  = segData.slice();
       const lastInterior = poses.length - 2;
-      newSegData[i - 1]        = evalSegment(newPoses[i - 1], newPoses[i],                        collisionQuads, halfExtents, obbs);
-      newSegData[lastInterior] = evalSegment(newPoses[lastInterior], newPoses[lastInterior + 1],   collisionQuads, halfExtents, obbs);
+      for (let j = i - 1; j <= lastInterior; j++) {
+        newSegData[j] = evalSegment(newPoses[j], newPoses[j + 1], collisionQuads, halfExtents, obbs);
+      }
       newEnergy = totalEnergy(newSegData, newPoses, w);
 
     } else if (r < 0.75 && poses.length > 2) {
       // ── Backward propagate ───────────────────────────────────────────────
       // Shift poses[1..i] by same delta on one rotation DOF.
-      // Only two boundary segments change: [0] and [i].
+      // All segments from [0] through [i] are affected by the rotation.
       const i    = 1 + Math.floor(Math.random() * (poses.length - 2));
       const dof  = ROTATION_DOFS[Math.floor(Math.random() * 3)];
       const delta = randn() * SIGMA[dof] * T;
       newPoses   = applyRotationPropagation(poses, 1, i + 1, dof, delta);
       newSegData  = segData.slice();
-      newSegData[0] = evalSegment(newPoses[0], newPoses[1],           collisionQuads, halfExtents, obbs);
-      newSegData[i] = evalSegment(newPoses[i], newPoses[i + 1],       collisionQuads, halfExtents, obbs);
+      for (let j = 0; j <= i; j++) {
+        newSegData[j] = evalSegment(newPoses[j], newPoses[j + 1], collisionQuads, halfExtents, obbs);
+      }
       newEnergy = totalEnergy(newSegData, newPoses, w);
 
     } else if (r < 0.90 || poses.length <= 2) {
