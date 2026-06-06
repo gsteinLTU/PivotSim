@@ -293,7 +293,25 @@ function buildHallway(group, quads, params, position) {
     normal: [0, -1, 0],
   });
 
-  // End cap (only when hallway is turned, fills gap where unrotated hallway meets stairwell)
+  // First end cap (prevents box from trying to travel through the void outside the stairwell)
+  const ecGeo = new THREE.PlaneGeometry(hallwayWidth, ceilingHeight);
+  const ecMesh = new THREE.Mesh(ecGeo, wallMat);
+  ecMesh.position.set(0, ceilingHeight / 2, 0);
+  ecMesh.userData.isSurface = true;
+  hallGroup.add(ecMesh);
+  
+  hallQuads.push({
+    type: 'wall-end',
+    vertices: [
+      [-hallHalfW, 0, -len],
+      [hallHalfW, 0, -len],
+      [hallHalfW, ceilingHeight, -len],
+      [-hallHalfW, ceilingHeight, -len],
+    ],
+    normal: [0, 0, -1],
+  });
+
+  // Second end cap (only when hallway is turned, fills gap where unrotated hallway meets stairwell)
   if (turnDeg !== 0) {
     const ecGeo = new THREE.PlaneGeometry(hallwayWidth, ceilingHeight);
     const ecMesh = new THREE.Mesh(ecGeo, wallMat);
