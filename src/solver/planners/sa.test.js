@@ -1,0 +1,96 @@
+import { describe, it, expect } from 'vitest';
+import { saPlanner, evalSegment, DEFAULT_WEIGHTS } from './sa.js';
+
+// ── Shared fixtures ────────────────────────────────────────────────────────
+
+const openQuads = [
+  { type: 'floor',   vertices: [[-20,0,-20],[20,0,-20],[20,0,20],[-20,0,20]],     normal: [0,1,0]  },
+  { type: 'ceiling', vertices: [[-20,10,-20],[20,10,-20],[20,10,20],[-20,10,20]], normal: [0,-1,0] },
+];
+const tinyHalf = [0.05, 0.05, 0.05];
+
+const openContext = {
+  collisionQuads: openQuads,
+  halfExtents: tinyHalf,
+  startPose: { x: 0, y: 1.2, z: -2.5, yaw: 0, pitch: 0, roll: 0 },
+  endPose:   { x: 0, y: 1.2, z:  2.5, yaw: 0, pitch: 0, roll: 0 },
+  containmentOBBs: [],
+  centerline: {
+    points: [[0, 0, -5], [0, 0, -1.5], [0, 0, 0], [0, 0, 1.5], [0, 0, 5]],
+    totalLength: 10,
+    ceilingHeight: 2.4,
+  },
+};
+
+// ── evalSegment ────────────────────────────────────────────────────────────
+
+describe('evalSegment', () => {
+  it('returns zero collEnergy for a clear segment far from surfaces', () => {
+    const a = { x: 0, y: 5, z: -1, yaw: 0, pitch: 0, roll: 0 };
+    const b = { x: 0, y: 5, z:  1, yaw: 0, pitch: 0, roll: 0 };
+    const seg = evalSegment(a, b, openQuads, tinyHalf);
+    expect(seg.collEnergy).toBe(0);
+    expect(seg.clrEnergy).toBeGreaterThan(0);
+    expect(seg.duration).toBeGreaterThan(0);
+  });
+
+  it('returns positive collEnergy when segment clips a wall', () => {
+    const wallQuad = {
+      type: 'wall',
+      vertices: [[0.1,-5,-5],[0.1,5,-5],[0.1,5,5],[0.1,-5,5]],
+      normal: [-1, 0, 0],
+    };
+    const a = { x: 0, y: 1, z: -1, yaw: 0, pitch: 0, roll: 0 };
+    const b = { x: 0, y: 1, z:  1, yaw: 0, pitch: 0, roll: 0 };
+    const seg = evalSegment(a, b, [wallQuad], [0.5, 0.25, 0.5]);
+    expect(seg.collEnergy).toBeGreaterThan(0);
+  });
+});
+
+// ── saPlanner.plan ─────────────────────────────────────────────────────────
+
+describe('saPlanner.plan', () => {
+  it('returns PlanResult with correct shape', async () => {
+    const result = await saPlanner.plan(openContext, { maxIter: 100 }, null, null);
+    expect(Array.isArray(result.poses)).toBe(true);
+    expect(result.poses.length).toBeGreaterThanOrEqual(2);
+    expect(typeof result.fits).toBe('boolean');
+    expect(typeof result.tightestIndex).toBe('number');
+    expect(result.tightestIndex).toBeGreaterThanOrEqual(0);
+    expect(result.tightestIndex).toBeLessThan(result.poses.length);
+  });
+
+  it('does not include segmentTimes or totalTime in result', async () => {
+    const result = await saPlanner.plan(openContext, { maxIter: 50 }, null, null);
+    expect(result.segmentTimes).toBeUndefined();
+    expect(result.totalTime).toBeUndefined();
+  });
+
+  it('fits === true for open space with tiny box', async () => {
+    const result = await saPlanner.plan(openContext, { maxIter: 10 }, null, null);
+    expect(result.fits).toBe(true);
+  });
+
+  it('calls onProgress with correct shape', async () => {
+    const calls = [];
+    await saPlanner.plan(openContext, { maxIter: 600 }, (p) => calls.push(p), null);
+    expect(calls.length).toBeGreaterThan(0);
+    const p = calls[0];
+    expect(Array.isArray(p.poses)).toBe(true);
+    expect(typeof p.energy).toBe('number');
+    expect(typeof p.temperature).toBe('number');
+    expect(typeof p.iteration).toBe('number');
+    expect(typeof p.maxIter).toBe('number');
+  });
+
+  it('respects shouldCancel', async () => {
+    let callCount = 0;
+    const result = await saPlanner.plan(
+      openContext, { maxIter: 50000 },
+      () => { callCount++; },
+      () => callCount >= 1
+    );
+    expect(result.poses.length).toBeGreaterThanOrEqual(2);
+    expect(callCount).toBeLessThan(10);
+  });
+});
