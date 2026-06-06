@@ -220,9 +220,9 @@ export function createConfigPanel(container, initialParams, onChange) {
   container.appendChild(boxDimsTitle);
 
   for (const def of [
-    { key: 'length', label: 'Length (m)', min: 0.3, max: 4.0, step: 0.05 },
-    { key: 'width',  label: 'Width (m)',  min: 0.3, max: 2.0, step: 0.05 },
-    { key: 'height', label: 'Height (m)', min: 0.1, max: 1.5, step: 0.05 },
+    { key: 'boxLength', label: 'Length', min: 0.3, max: 4.0, step: 0.05, dimKey: 'length' },
+    { key: 'boxWidth',  label: 'Width',  min: 0.3, max: 2.0, step: 0.05, dimKey: 'width'  },
+    { key: 'boxHeight', label: 'Height', min: 0.1, max: 1.5, step: 0.05, dimKey: 'height' },
   ]) {
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'margin-bottom:12px;';
@@ -230,19 +230,50 @@ export function createConfigPanel(container, initialParams, onChange) {
     lbl.textContent = def.label;
     lbl.style.cssText = 'display:block; font-size:12px; margin-bottom:4px; color:#aaa;';
     wrapper.appendChild(lbl);
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:6px;';
+
     const inp = document.createElement('input');
     inp.type = 'number';
-    inp.value = boxDims[def.key];
-    inp.min = def.min;
-    inp.max = def.max;
-    inp.step = def.step;
-    inp.style.cssText = 'width:100%; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
+    const unit = unitPrefs[def.key];
+    inp.value = parseFloat(fromMeters(boxDims[def.dimKey], unit).toPrecision(4));
+    inp.min = parseFloat(fromMeters(def.min, unit).toPrecision(4));
+    inp.max = parseFloat(fromMeters(def.max, unit).toPrecision(4));
+    inp.step = parseFloat(fromMeters(def.step, unit).toPrecision(3));
+    inp.style.cssText = 'flex:1; min-width:0; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
+
+    const unitSel = document.createElement('select');
+    unitSel.style.cssText = 'background:#0d1b2a; color:#64ffda; border:1px solid #334; border-radius:4px; padding:2px 4px; font-size:11px;';
+    for (const u of ['m', 'ft', 'in']) {
+      const o = document.createElement('option');
+      o.value = u;
+      o.textContent = u;
+      if (u === unit) o.selected = true;
+      unitSel.appendChild(o);
+    }
+
     inp.addEventListener('input', () => {
-      boxDims[def.key] = Number(inp.value);
+      boxDims[def.dimKey] = toMeters(Number(inp.value), unitPrefs[def.key]);
       clearTimeout(boxDimsTimer);
       boxDimsTimer = setTimeout(() => { if (boxDimsCallback) boxDimsCallback({ ...boxDims }); }, 100);
     });
-    wrapper.appendChild(inp);
+
+    unitSel.addEventListener('change', () => {
+      const oldUnit = unitPrefs[def.key];
+      const newUnit = unitSel.value;
+      const meters = toMeters(Number(inp.value), oldUnit);
+      unitPrefs[def.key] = newUnit;
+      inp.value = parseFloat(fromMeters(meters, newUnit).toPrecision(4));
+      inp.min = parseFloat(fromMeters(def.min, newUnit).toPrecision(4));
+      inp.max = parseFloat(fromMeters(def.max, newUnit).toPrecision(4));
+      inp.step = parseFloat(fromMeters(def.step, newUnit).toPrecision(3));
+      saveUnits();
+    });
+
+    row.appendChild(inp);
+    row.appendChild(unitSel);
+    wrapper.appendChild(row);
     container.appendChild(wrapper);
   }
 

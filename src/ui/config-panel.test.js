@@ -96,10 +96,11 @@ describe('createConfigPanel', () => {
     const cb = vi.fn();
     panel.onBoxDimsChange(cb);
 
-    // Box dim inputs follow all the stairwell inputs; find by label text
+    // Box dim inputs are in a flex row; find by label text then get input from the row
     const labels = Array.from(container.querySelectorAll('label'));
-    const lengthLabel = labels.find((l) => l.textContent === 'Length (m)');
-    const input = lengthLabel.nextElementSibling;
+    const lengthLabel = labels.find((l) => l.textContent === 'Length');
+    const row = lengthLabel.nextElementSibling;
+    const input = row.querySelector('input[type="number"]');
     input.value = '1.5';
     input.dispatchEvent(new Event('input'));
 
@@ -295,5 +296,46 @@ describe('stairwell config unit dropdowns', () => {
     const numberInput = unitSelects[0].closest('div').querySelector('input[type="number"]');
     // stairWidth default 1.0 m shown in inches
     expect(Number(numberInput.value)).toBeCloseTo(39.37, 1);
+  });
+});
+
+describe('box dimensions unit dropdowns', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('box dimension inputs have unit selects', () => {
+    const container = document.createElement('div');
+    createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    const selects = Array.from(container.querySelectorAll('select'));
+    const unitSelects = selects.filter((s) =>
+      Array.from(s.options).some((o) => o.value === 'in')
+    );
+    // 7 stairwell length fields + 3 box dims = at least 10
+    expect(unitSelects.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('onBoxDimsChange callback receives meters', async () => {
+    const container = document.createElement('div');
+    const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    const cb = vi.fn();
+    panel.onBoxDimsChange(cb);
+
+    // Find Box Dimensions section — length label now reads 'Length' (no unit suffix)
+    const labels = Array.from(container.querySelectorAll('label'));
+    const lengthLabel = labels.find((l) => l.textContent === 'Length');
+    const row = lengthLabel.nextElementSibling;
+    const unitSel = row.querySelector('select');
+    const input = row.querySelector('input[type="number"]');
+
+    unitSel.value = 'in';
+    unitSel.dispatchEvent(new Event('change'));
+
+    // type 19.685 in ≈ 0.5 m
+    input.value = '19.685';
+    input.dispatchEvent(new Event('input'));
+
+    await new Promise((r) => setTimeout(r, 150));
+    expect(cb).toHaveBeenCalledWith(
+      expect.objectContaining({ length: expect.closeTo(0.5, 2) })
+    );
   });
 });
