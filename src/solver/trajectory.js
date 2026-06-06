@@ -168,7 +168,8 @@ export async function optimizeTrajectory(
       newSegData[i]     = evalSegment(newPoses[i],     newPoses[i + 1], collisionQuads, halfExtents);
       newEnergy = totalEnergy(newSegData, newPoses, w);
 
-    } else if (r < 0.9) {
+    } else if (r < 0.9 || poses.length <= 2) {
+      // ── Split (also used as fallback when merge is impossible) ────────────
       // ── Split ─────────────────────────────────────────────────────────────
       let worstIdx = 0;
       for (let i = 1; i < segData.length; i++) {
@@ -190,7 +191,7 @@ export async function optimizeTrajectory(
       ];
       newEnergy = totalEnergy(newSegData, newPoses, w);
 
-    } else if (poses.length > 2) {
+    } else {
       // ── Merge ─────────────────────────────────────────────────────────────
       const i = 1 + Math.floor(Math.random() * (poses.length - 2));
       newPoses = [...poses.slice(0, i), ...poses.slice(i + 1)];
@@ -200,9 +201,6 @@ export async function optimizeTrajectory(
         ...segData.slice(i + 1),
       ];
       newEnergy = totalEnergy(newSegData, newPoses, w);
-
-    } else {
-      continue;
     }
 
     // Metropolis acceptance
