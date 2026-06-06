@@ -58,6 +58,13 @@ export function loadStoredValues(defaults, storageKey, positiveKeys = new Set())
   return result;
 }
 
+const POSITIVE_PARAMS = new Set([
+  'stairWidth', 'numSteps', 'risePerStep', 'runPerStep',
+  'bottomHallwayWidth', 'topHallwayWidth', 'ceilingHeight', 'hallwayLength',
+]);
+
+const POSITIVE_BOX_DIMS = new Set(['length', 'width', 'height']);
+
 const FIELD_DEFS = [
   { key: 'stairWidth',        label: 'Stair Width',          type: 'number', hasUnit: true,  min: 0.5,  max: 3,   step: 0.05 },
   { key: 'numSteps',          label: 'Number of Steps',      type: 'number', hasUnit: false, min: 1,    max: 30,  step: 1    },
@@ -81,14 +88,14 @@ const FIELD_DEFS = [
 ];
 
 export function createConfigPanel(container, initialParams, onChange) {
-  const params = { ...initialParams };
+  const params  = loadStoredValues(initialParams,     'pivotsim_params',    POSITIVE_PARAMS);
   let debounceTimer = null;
   let boxDimsTimer = null;
   let boxPoseTimer = null;
   let boxDimsCallback = null;
   let boxPoseCallback = null;
-  const boxDims = { ...BOX_DEFAULTS };
-  const boxPose = { ...BOX_POSE_DEFAULTS };
+  const boxDims = loadStoredValues(BOX_DEFAULTS,      'pivotsim_box_dims',  POSITIVE_BOX_DIMS);
+  const boxPose = loadStoredValues(BOX_POSE_DEFAULTS, 'pivotsim_box_pose',  new Set());
 
   const STAIRWELL_UNIT_KEYS = FIELD_DEFS.filter((d) => d.hasUnit).map((d) => d.key);
   const ALL_UNIT_KEYS = [
@@ -100,6 +107,10 @@ export function createConfigPanel(container, initialParams, onChange) {
 
   function saveUnits() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(unitPrefs)); } catch { /* ignore */ }
+  }
+
+  function saveValues(values, key) {
+    try { localStorage.setItem(key, JSON.stringify(values)); } catch { /* ignore */ }
   }
 
   const title = document.createElement('h2');
@@ -204,7 +215,10 @@ export function createConfigPanel(container, initialParams, onChange) {
 
   function scheduleUpdate() {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => onChange({ ...params }), 100);
+    debounceTimer = setTimeout(() => {
+      saveValues(params, 'pivotsim_params');
+      onChange({ ...params });
+    }, 100);
   }
 
   // Ceiling visibility toggle
@@ -282,7 +296,10 @@ export function createConfigPanel(container, initialParams, onChange) {
     inp.addEventListener('input', () => {
       boxDims[def.dimKey] = toMeters(Number(inp.value), unitPrefs[def.key]);
       clearTimeout(boxDimsTimer);
-      boxDimsTimer = setTimeout(() => { if (boxDimsCallback) boxDimsCallback({ ...boxDims }); }, 100);
+      boxDimsTimer = setTimeout(() => {
+        saveValues(boxDims, 'pivotsim_box_dims');
+        if (boxDimsCallback) boxDimsCallback({ ...boxDims });
+      }, 100);
     });
 
     unitSel.addEventListener('change', () => {
@@ -354,7 +371,10 @@ export function createConfigPanel(container, initialParams, onChange) {
       inp.addEventListener('input', () => {
         boxPose[def.key] = toMeters(Number(inp.value), unitPrefs[def.key]);
         clearTimeout(boxPoseTimer);
-        boxPoseTimer = setTimeout(() => { if (boxPoseCallback) boxPoseCallback({ ...boxPose }); }, 100);
+        boxPoseTimer = setTimeout(() => {
+          saveValues(boxPose, 'pivotsim_box_pose');
+          if (boxPoseCallback) boxPoseCallback({ ...boxPose });
+        }, 100);
       });
 
       unitSel.addEventListener('change', () => {
@@ -383,7 +403,10 @@ export function createConfigPanel(container, initialParams, onChange) {
       inp.addEventListener('input', () => {
         boxPose[def.key] = Number(inp.value);
         clearTimeout(boxPoseTimer);
-        boxPoseTimer = setTimeout(() => { if (boxPoseCallback) boxPoseCallback({ ...boxPose }); }, 100);
+        boxPoseTimer = setTimeout(() => {
+          saveValues(boxPose, 'pivotsim_box_pose');
+          if (boxPoseCallback) boxPoseCallback({ ...boxPose });
+        }, 100);
       });
       wrapper.appendChild(inp);
     }

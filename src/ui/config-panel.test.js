@@ -395,6 +395,85 @@ describe('box pose unit dropdowns', () => {
   });
 });
 
+describe('value persistence', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('loads persisted stairwell params on init', () => {
+    localStorage.setItem('pivotsim_params', JSON.stringify({ stairWidth: 1.5 }));
+    const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
+    expect(panel.getParams().stairWidth).toBeCloseTo(1.5);
+  });
+
+  it('loads persisted box dims on init', () => {
+    localStorage.setItem('pivotsim_box_dims', JSON.stringify({ length: 0.8 }));
+    const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
+    expect(panel.getBoxDims().length).toBeCloseTo(0.8);
+  });
+
+  it('loads persisted box pose on init', () => {
+    localStorage.setItem('pivotsim_box_pose', JSON.stringify({ x: 1.2, yaw: 45 }));
+    const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
+    expect(panel.getBoxPose().x).toBeCloseTo(1.2);
+    expect(panel.getBoxPose().yaw).toBe(45);
+  });
+
+  it('saves params to localStorage after stairwell input change', async () => {
+    const container = document.createElement('div');
+    createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    const labels = Array.from(container.querySelectorAll('label'));
+    const numStepsLabel = labels.find((l) => l.textContent === 'Number of Steps');
+    const input = numStepsLabel.nextElementSibling;
+    input.value = '15';
+    input.dispatchEvent(new Event('input'));
+    await new Promise((r) => setTimeout(r, 150));
+    const stored = JSON.parse(localStorage.getItem('pivotsim_params'));
+    expect(stored.numSteps).toBe(15);
+  });
+
+  it('saves box dims to localStorage after box dim input change', async () => {
+    const container = document.createElement('div');
+    const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    panel.onBoxDimsChange(vi.fn());
+    const labels = Array.from(container.querySelectorAll('label'));
+    const lengthLabel = labels.find((l) => l.textContent === 'Length');
+    const row = lengthLabel.nextElementSibling;
+    const input = row.querySelector('input[type="number"]');
+    input.value = '0.7';
+    input.dispatchEvent(new Event('input'));
+    await new Promise((r) => setTimeout(r, 150));
+    const stored = JSON.parse(localStorage.getItem('pivotsim_box_dims'));
+    expect(stored.length).toBeCloseTo(0.7);
+  });
+
+  it('saves box pose to localStorage after yaw change', async () => {
+    const container = document.createElement('div');
+    const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    panel.onBoxPoseChange(vi.fn());
+    const labels = Array.from(container.querySelectorAll('label'));
+    const yawLabel = labels.find((l) => l.textContent === 'Yaw');
+    const input = yawLabel.nextElementSibling;
+    input.value = '90';
+    input.dispatchEvent(new Event('input'));
+    await new Promise((r) => setTimeout(r, 150));
+    const stored = JSON.parse(localStorage.getItem('pivotsim_box_pose'));
+    expect(stored.yaw).toBe(90);
+  });
+
+  it('rejects negative stored stairWidth (positive-only), uses default', () => {
+    localStorage.setItem('pivotsim_params', JSON.stringify({ stairWidth: -1.0 }));
+    const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
+    expect(panel.getParams().stairWidth).toBe(DEFAULTS.stairWidth);
+  });
+
+  it('accepts negative stored z for box pose (not positive-only)', () => {
+    localStorage.setItem('pivotsim_box_pose', JSON.stringify({ z: -2.0 }));
+    const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
+    expect(panel.getBoxPose().z).toBeCloseTo(-2.0);
+  });
+});
+
 describe('loadStoredValues', () => {
   const DEFS = { width: 1.0, steps: 12, active: true };
   const KEY = 'pivotsim_test_lsv';
