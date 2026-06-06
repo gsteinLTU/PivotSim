@@ -288,12 +288,12 @@ export function createConfigPanel(container, initialParams, onChange) {
   container.appendChild(boxPoseTitle);
 
   for (const def of [
-    { key: 'x',     label: 'X (m)',      min: -6, max: 6,    step: 0.05 },
-    { key: 'y',     label: 'Y (m)',      min: -1, max: 5,    step: 0.05 },
-    { key: 'z',     label: 'Z (m)',      min: -6, max: 6,    step: 0.05 },
-    { key: 'yaw',   label: 'Yaw (°)',    min: -180, max: 180, step: 1 },
-    { key: 'pitch', label: 'Pitch (°)',  min: -90,  max: 90,  step: 1 },
-    { key: 'roll',  label: 'Roll (°)',   min: -180, max: 180, step: 1 },
+    { key: 'x',     label: 'X',     hasUnit: true,  min: -6,   max: 6,    step: 0.05 },
+    { key: 'y',     label: 'Y',     hasUnit: true,  min: -1,   max: 5,    step: 0.05 },
+    { key: 'z',     label: 'Z',     hasUnit: true,  min: -6,   max: 6,    step: 0.05 },
+    { key: 'yaw',   label: 'Yaw',   hasUnit: false, min: -180, max: 180,  step: 1    },
+    { key: 'pitch', label: 'Pitch', hasUnit: false, min: -90,  max: 90,   step: 1    },
+    { key: 'roll',  label: 'Roll',  hasUnit: false, min: -180, max: 180,  step: 1    },
   ]) {
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'margin-bottom:12px;';
@@ -301,19 +301,67 @@ export function createConfigPanel(container, initialParams, onChange) {
     lbl.textContent = def.label;
     lbl.style.cssText = 'display:block; font-size:12px; margin-bottom:4px; color:#aaa;';
     wrapper.appendChild(lbl);
-    const inp = document.createElement('input');
-    inp.type = 'number';
-    inp.value = boxPose[def.key];
-    inp.min = def.min;
-    inp.max = def.max;
-    inp.step = def.step;
-    inp.style.cssText = 'width:100%; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
-    inp.addEventListener('input', () => {
-      boxPose[def.key] = Number(inp.value);
-      clearTimeout(boxPoseTimer);
-      boxPoseTimer = setTimeout(() => { if (boxPoseCallback) boxPoseCallback({ ...boxPose }); }, 100);
-    });
-    wrapper.appendChild(inp);
+
+    if (def.hasUnit) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:6px;';
+
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      const unit = unitPrefs[def.key];
+      inp.value = parseFloat(fromMeters(boxPose[def.key], unit).toPrecision(4));
+      inp.min = parseFloat(fromMeters(def.min, unit).toPrecision(4));
+      inp.max = parseFloat(fromMeters(def.max, unit).toPrecision(4));
+      inp.step = parseFloat(fromMeters(def.step, unit).toPrecision(3));
+      inp.style.cssText = 'flex:1; min-width:0; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
+
+      const unitSel = document.createElement('select');
+      unitSel.style.cssText = 'background:#0d1b2a; color:#64ffda; border:1px solid #334; border-radius:4px; padding:2px 4px; font-size:11px;';
+      for (const u of ['m', 'ft', 'in']) {
+        const o = document.createElement('option');
+        o.value = u;
+        o.textContent = u;
+        if (u === unit) o.selected = true;
+        unitSel.appendChild(o);
+      }
+
+      inp.addEventListener('input', () => {
+        boxPose[def.key] = toMeters(Number(inp.value), unitPrefs[def.key]);
+        clearTimeout(boxPoseTimer);
+        boxPoseTimer = setTimeout(() => { if (boxPoseCallback) boxPoseCallback({ ...boxPose }); }, 100);
+      });
+
+      unitSel.addEventListener('change', () => {
+        const oldUnit = unitPrefs[def.key];
+        const newUnit = unitSel.value;
+        const meters = toMeters(Number(inp.value), oldUnit);
+        unitPrefs[def.key] = newUnit;
+        inp.value = parseFloat(fromMeters(meters, newUnit).toPrecision(4));
+        inp.min = parseFloat(fromMeters(def.min, newUnit).toPrecision(4));
+        inp.max = parseFloat(fromMeters(def.max, newUnit).toPrecision(4));
+        inp.step = parseFloat(fromMeters(def.step, newUnit).toPrecision(3));
+        saveUnits();
+      });
+
+      row.appendChild(inp);
+      row.appendChild(unitSel);
+      wrapper.appendChild(row);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.value = boxPose[def.key];
+      inp.min = def.min;
+      inp.max = def.max;
+      inp.step = def.step;
+      inp.style.cssText = 'width:100%; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
+      inp.addEventListener('input', () => {
+        boxPose[def.key] = Number(inp.value);
+        clearTimeout(boxPoseTimer);
+        boxPoseTimer = setTimeout(() => { if (boxPoseCallback) boxPoseCallback({ ...boxPose }); }, 100);
+      });
+      wrapper.appendChild(inp);
+    }
+
     container.appendChild(wrapper);
   }
 

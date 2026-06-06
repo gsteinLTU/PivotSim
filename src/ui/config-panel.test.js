@@ -339,3 +339,54 @@ describe('box dimensions unit dropdowns', () => {
     );
   });
 });
+
+describe('box pose unit dropdowns', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('x/y/z pose inputs have unit selects; yaw/pitch/roll do not', () => {
+    const container = document.createElement('div');
+    createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    const selects = Array.from(container.querySelectorAll('select'));
+    const unitSelects = selects.filter((s) =>
+      Array.from(s.options).some((o) => o.value === 'in')
+    );
+    // 7 stairwell + 3 box dims + 3 pose (x,y,z) = 13
+    expect(unitSelects.length).toBe(13);
+  });
+
+  it('onBoxPoseChange callback receives meters for x/y/z', async () => {
+    const container = document.createElement('div');
+    const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    const cb = vi.fn();
+    panel.onBoxPoseChange(cb);
+
+    const labels = Array.from(container.querySelectorAll('label'));
+    const xLabel = labels.find((l) => l.textContent === 'X');
+    const row = xLabel.nextElementSibling;
+    const unitSel = row.querySelector('select');
+    const input = row.querySelector('input[type="number"]');
+
+    unitSel.value = 'in';
+    unitSel.dispatchEvent(new Event('change'));
+
+    // type 3.937 in ≈ 0.1 m
+    input.value = '3.937';
+    input.dispatchEvent(new Event('input'));
+
+    await new Promise((r) => setTimeout(r, 150));
+    expect(cb).toHaveBeenCalledWith(
+      expect.objectContaining({ x: expect.closeTo(0.1, 2) })
+    );
+  });
+
+  it('yaw input has no unit select', () => {
+    const container = document.createElement('div');
+    createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    const labels = Array.from(container.querySelectorAll('label'));
+    const yawLabel = labels.find((l) => l.textContent === 'Yaw');
+    // Yaw input is a plain number input sibling, not in a flex row with a select
+    const next = yawLabel.nextElementSibling;
+    expect(next.tagName).toBe('INPUT');
+    expect(next.type).toBe('number');
+  });
+});
