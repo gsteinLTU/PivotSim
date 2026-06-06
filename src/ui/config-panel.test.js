@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createConfigPanel, toMeters, fromMeters, loadUnitPrefs } from './config-panel.js';
+import { createConfigPanel, toMeters, fromMeters, loadUnitPrefs, loadStoredValues } from './config-panel.js';
 import { DEFAULTS, BOX_DEFAULTS, BOX_POSE_DEFAULTS } from '../defaults.js';
 
 describe('createConfigPanel', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   function makeContainer() {
     const el = document.createElement('div');
     return el;
@@ -388,5 +392,77 @@ describe('box pose unit dropdowns', () => {
     const next = yawLabel.nextElementSibling;
     expect(next.tagName).toBe('INPUT');
     expect(next.type).toBe('number');
+  });
+});
+
+describe('loadStoredValues', () => {
+  const DEFS = { width: 1.0, steps: 12, active: true };
+  const KEY = 'pivotsim_test_lsv';
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('returns defaults when localStorage is empty', () => {
+    expect(loadStoredValues(DEFS, KEY, new Set())).toEqual(DEFS);
+  });
+
+  it('returns stored valid number and boolean values', () => {
+    localStorage.setItem(KEY, JSON.stringify({ width: 2.5, steps: 8, active: false }));
+    const result = loadStoredValues(DEFS, KEY, new Set());
+    expect(result.width).toBe(2.5);
+    expect(result.steps).toBe(8);
+    expect(result.active).toBe(false);
+  });
+
+  it('falls back to default for non-number stored in a number field', () => {
+    localStorage.setItem(KEY, JSON.stringify({ width: 'big', steps: null }));
+    const result = loadStoredValues(DEFS, KEY, new Set());
+    expect(result.width).toBe(1.0);
+    expect(result.steps).toBe(12);
+  });
+
+  it('falls back to default for Infinity in a number field', () => {
+    // JSON.stringify(Infinity) = 'null', so test via non-finite stored value
+    localStorage.setItem(KEY, JSON.stringify({ width: null }));
+    const result = loadStoredValues({ width: 1.0 }, KEY, new Set());
+    expect(result.width).toBe(1.0);
+  });
+
+  it('falls back to default for non-boolean stored in a boolean field', () => {
+    localStorage.setItem(KEY, JSON.stringify({ active: 'yes' }));
+    const result = loadStoredValues(DEFS, KEY, new Set());
+    expect(result.active).toBe(true);
+  });
+
+  it('ignores unknown keys in stored data', () => {
+    localStorage.setItem(KEY, JSON.stringify({ width: 2.5, extraKey: 99 }));
+    const result = loadStoredValues(DEFS, KEY, new Set());
+    expect(result).not.toHaveProperty('extraKey');
+    expect(result.width).toBe(2.5);
+  });
+
+  it('falls back to all defaults on JSON parse failure', () => {
+    localStorage.setItem(KEY, 'not-json{{{');
+    expect(loadStoredValues(DEFS, KEY, new Set())).toEqual(DEFS);
+  });
+
+  it('rejects zero and negative values for positiveKeys, uses default', () => {
+    localStorage.setItem(KEY, JSON.stringify({ width: -1.0, steps: 0 }));
+    const result = loadStoredValues(DEFS, KEY, new Set(['width', 'steps']));
+    expect(result.width).toBe(1.0);
+    expect(result.steps).toBe(12);
+  });
+
+  it('accepts positive values for positiveKeys', () => {
+    localStorage.setItem(KEY, JSON.stringify({ width: 0.5 }));
+    const result = loadStoredValues(DEFS, KEY, new Set(['width']));
+    expect(result.width).toBe(0.5);
+  });
+
+  it('does not apply positivity check to keys not in positiveKeys', () => {
+    localStorage.setItem(KEY, JSON.stringify({ width: -5.0 }));
+    const result = loadStoredValues(DEFS, KEY, new Set());
+    expect(result.width).toBe(-5.0);
   });
 });

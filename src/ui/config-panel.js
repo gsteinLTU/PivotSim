@@ -32,6 +32,32 @@ export function loadUnitPrefs(validKeys) {
   return prefs;
 }
 
+export function loadStoredValues(defaults, storageKey, positiveKeys = new Set()) {
+  let stored = {};
+  try {
+    const raw = localStorage.getItem(storageKey);
+    const parsed = JSON.parse(raw || '{}');
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      stored = parsed;
+    }
+  } catch {
+    // bad JSON — use all defaults
+  }
+  const result = {};
+  for (const [k, defaultVal] of Object.entries(defaults)) {
+    const v = stored[k];
+    if (typeof defaultVal === 'boolean') {
+      result[k] = typeof v === 'boolean' ? v : defaultVal;
+    } else if (typeof defaultVal === 'number') {
+      const valid = typeof v === 'number' && isFinite(v) && (!positiveKeys.has(k) || v > 0);
+      result[k] = valid ? v : defaultVal;
+    } else {
+      result[k] = defaultVal;
+    }
+  }
+  return result;
+}
+
 const FIELD_DEFS = [
   { key: 'stairWidth',        label: 'Stair Width',          type: 'number', hasUnit: true,  min: 0.5,  max: 3,   step: 0.05 },
   { key: 'numSteps',          label: 'Number of Steps',      type: 'number', hasUnit: false, min: 1,    max: 30,  step: 1    },
