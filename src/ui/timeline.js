@@ -94,8 +94,8 @@ export function createTimeline(container, callbacks) {
       onReset?.();
     });
     container.querySelector('#tl-prev').addEventListener('click', () => {
-      onPlayToggle?.(false);
       onPlayheadChange?.(0);
+      onPlayToggle?.(false);
     });
     container.querySelector('#tl-play').addEventListener('click', () => {
       const btn = container.querySelector('#tl-play');
