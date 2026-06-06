@@ -447,6 +447,21 @@ describe('value persistence', () => {
     expect(stored.length).toBeCloseTo(0.7);
   });
 
+  it('saves box pose to localStorage after x change', async () => {
+    const container = document.createElement('div');
+    const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    panel.onBoxPoseChange(vi.fn());
+    const labels = Array.from(container.querySelectorAll('label'));
+    const xLabel = labels.find((l) => l.textContent === 'X');
+    const row = xLabel.nextElementSibling;
+    const input = row.querySelector('input[type="number"]');
+    input.value = '0.5';
+    input.dispatchEvent(new Event('input'));
+    await new Promise((r) => setTimeout(r, 150));
+    const stored = JSON.parse(localStorage.getItem('pivotsim_box_pose'));
+    expect(stored.x).toBeCloseTo(0.5);
+  });
+
   it('saves box pose to localStorage after yaw change', async () => {
     const container = document.createElement('div');
     const panel = createConfigPanel(container, { ...DEFAULTS }, vi.fn());

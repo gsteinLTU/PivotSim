@@ -95,7 +95,7 @@ export function createConfigPanel(container, initialParams, onChange) {
   let boxDimsCallback = null;
   let boxPoseCallback = null;
   const boxDims = loadStoredValues(BOX_DEFAULTS,      'pivotsim_box_dims',  POSITIVE_BOX_DIMS);
-  const boxPose = loadStoredValues(BOX_POSE_DEFAULTS, 'pivotsim_box_pose',  new Set());
+  const boxPose = loadStoredValues(BOX_POSE_DEFAULTS, 'pivotsim_box_pose');
 
   const STAIRWELL_UNIT_KEYS = FIELD_DEFS.filter((d) => d.hasUnit).map((d) => d.key);
   const ALL_UNIT_KEYS = [
