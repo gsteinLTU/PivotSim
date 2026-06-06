@@ -85,7 +85,7 @@ export function testOBBvsQuad(obb, quad) {
 /**
  * Tests OBB against every quad in the array.
  * Returns { collides, minClearance, contactQuads }
- *   minClearance: min clearance across non-colliding quads (0 if colliding or if array is empty)
+ *   minClearance: signed min clearance across all quads — negative when penetrating (0 if array is empty)
  */
 export function checkCollisions(obb, collisionQuads) {
   let collides = false;
