@@ -1,66 +1,17 @@
 import { checkCollisions } from './collision.js';
-import { getEndpoints } from './path.js';
-
-export const MAX_LINEAR_SPEED  = 0.5;   // m/s
-export const MAX_ANGULAR_SPEED = 0.5;   // rad/s
-const CLEARANCE_CAP = 0.3;              // m — clearance reward capped here
-const DOFS = ['x', 'y', 'z', 'yaw', 'pitch', 'roll'];
-const ROTATION_DOFS = ['yaw', 'pitch', 'roll'];
-const SIGMA = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.3, pitch: 0.2, roll: 0.2 };
+import {
+  euclideanDelta, angularDelta, segmentDuration, lerpPose, applyRotationPropagation,
+  MAX_LINEAR_SPEED, MAX_ANGULAR_SPEED,
+} from './utils.js';
 
 export const DEFAULT_WEIGHTS = {
   w_col: 100, w_clr: 1.5, w_rot: 0.45, w_pos: 0.45, w_time: 0.5, w_void: 150, w_nk: 2,
 };
 
-// ── Pure math helpers ──────────────────────────────────────────────────────
-
-export function euclideanDelta(a, b) {
-  const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-  return Math.sqrt(dx*dx + dy*dy + dz*dz);
-}
-
-// Shortest signed angular difference, result in (−π, π]
-function angleDiff(from, to) {
-  let d = (to - from) % (2 * Math.PI);
-  if (d >  Math.PI) d -= 2 * Math.PI;
-  if (d < -Math.PI) d += 2 * Math.PI;
-  return d;
-}
-
-export function angularDelta(a, b) {
-  return Math.abs(angleDiff(a.yaw, b.yaw))
-       + Math.abs(angleDiff(a.pitch, b.pitch))
-       + Math.abs(angleDiff(a.roll, b.roll));
-}
-
-export function segmentDuration(a, b) {
-  return Math.max(
-    euclideanDelta(a, b) / MAX_LINEAR_SPEED,
-    angularDelta(a, b)   / MAX_ANGULAR_SPEED,
-  );
-}
-
-export function lerpPose(a, b, t) {
-  return {
-    x:     a.x     + (b.x     - a.x)     * t,
-    y:     a.y     + (b.y     - a.y)     * t,
-    z:     a.z     + (b.z     - a.z)     * t,
-    yaw:   a.yaw   + angleDiff(a.yaw,   b.yaw)   * t,
-    pitch: a.pitch + angleDiff(a.pitch, b.pitch) * t,
-    roll:  a.roll  + angleDiff(a.roll,  b.roll)  * t,
-  };
-}
-
-/**
- * Returns a new poses array where poses[startIdx..endIdx-1][dof] += delta.
- * Used by forward and backward propagate SA moves.
- * Only rotation DOFs (yaw, pitch, roll) should be passed as dof.
- */
-export function applyRotationPropagation(poses, startIdx, endIdx, dof, delta) {
-  return poses.map((p, j) =>
-    j >= startIdx && j < endIdx ? { ...p, [dof]: p[dof] + delta } : { ...p }
-  );
-}
+const CLEARANCE_CAP = 0.3;
+const DOFS = ['x', 'y', 'z', 'yaw', 'pitch', 'roll'];
+const ROTATION_DOFS = ['yaw', 'pitch', 'roll'];
+const SIGMA = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.3, pitch: 0.2, roll: 0.2 };
 
 // Pure-math OBB — same convention as box.js computeOBB (YXZ Euler), no Three.js.
 // R = Ry(yaw) × Rx(pitch) × Rz(roll); columns are local-axis world directions.
@@ -193,7 +144,6 @@ export async function optimizeTrajectory(
   const obbs = containmentOBBs ?? [];
   const BATCH    = 500;
 
-  const { start, end } = getEndpoints(centerline);
   const { points } = centerline;
 
   // Place start/end at hallway midpoint so the box begins fully inside.

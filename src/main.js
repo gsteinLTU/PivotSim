@@ -7,7 +7,7 @@ import { createBoxMesh, updateBoxMeshPose, computeOBB, getHalfExtents } from './
 import { checkCollisions } from './solver/collision.js';
 import { DEFAULTS, BOX_DEFAULTS, BOX_POSE_DEFAULTS } from './defaults.js';
 import { createTimeline } from './ui/timeline.js';
-import { lerpPose } from './solver/trajectory.js';
+import { lerpPose } from './solver/utils.js';
 
 const DEG = Math.PI / 180;
 const MAX_GHOST = 20;
