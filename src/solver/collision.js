@@ -46,7 +46,7 @@ function testAxis(obb, quadVerts, axis) {
  * SAT test: OBB vs a single quad.
  * Returns { collides: boolean, clearance: number }
  *   collides=false → clearance = gap on the most-separating axis (approx lower bound on true distance)
- *   collides=true  → clearance = 0
+ *   collides=true  → clearance = maxGap (≤ 0; magnitude is approximate penetration depth)
  */
 export function testOBBvsQuad(obb, quad) {
   const verts = quad.vertices;
