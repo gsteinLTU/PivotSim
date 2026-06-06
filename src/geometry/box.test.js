@@ -41,6 +41,32 @@ describe('computeOBB', () => {
     expect(obb.axes[2][1]).toBeCloseTo(0);
     expect(obb.axes[2][2]).toBeCloseTo(0);
   });
+
+  it('combined pitch+roll with YXZ order', () => {
+    // 90° pitch (around X) + 90° yaw (around Y)
+    // YXZ order: yaw first, then pitch, then roll
+    const obb = computeOBB(
+      { x: 0, y: 0, z: 0, yaw: Math.PI / 2, pitch: Math.PI / 2, roll: 0 },
+      [0.4, 0.25, 1.0]
+    );
+    // After 90° yaw (Y): X→-Z, Z→+X
+    // After 90° pitch (X): Y→-Z, Z→+Y (applied in rotated frame)
+    // local Y axis should no longer be [0,1,0]
+    const yAxis = obb.axes[1];
+    expect(Math.abs(yAxis[0]) + Math.abs(yAxis[1]) + Math.abs(yAxis[2])).toBeCloseTo(1, 4);
+    expect(yAxis[1]).not.toBeCloseTo(1); // must have rotated away from pure Y
+  });
+
+  it('roll rotates local X toward local Y', () => {
+    const obb = computeOBB(
+      { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: Math.PI / 2 },
+      [0.4, 0.25, 1.0]
+    );
+    // 90° roll (around Z): local X → local Y direction
+    expect(obb.axes[0][0]).toBeCloseTo(0);
+    expect(obb.axes[0][1]).toBeCloseTo(1);
+    expect(obb.axes[0][2]).toBeCloseTo(0);
+  });
 });
 
 describe('getOBBCorners', () => {
@@ -84,5 +110,23 @@ describe('getOBBCorners', () => {
     // World X span: ±3 (from length axis)
     expect(Math.min(...xs)).toBeCloseTo(-3);
     expect(Math.max(...xs)).toBeCloseTo(3);
+  });
+
+  it('non-zero center offsets all corners', () => {
+    const obb = {
+      center: [10, 20, 30],
+      axes: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      halfExtents: [1, 1, 1],
+    };
+    const corners = getOBBCorners(obb);
+    const xs = corners.map((c) => c[0]);
+    const ys = corners.map((c) => c[1]);
+    const zs = corners.map((c) => c[2]);
+    expect(Math.min(...xs)).toBeCloseTo(9);
+    expect(Math.max(...xs)).toBeCloseTo(11);
+    expect(Math.min(...ys)).toBeCloseTo(19);
+    expect(Math.max(...ys)).toBeCloseTo(21);
+    expect(Math.min(...zs)).toBeCloseTo(29);
+    expect(Math.max(...zs)).toBeCloseTo(31);
   });
 });
