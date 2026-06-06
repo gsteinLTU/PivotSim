@@ -122,8 +122,8 @@ export function createConfigPanel(container, initialParams, onChange) {
       input.type = 'number';
       const unit = unitPrefs[def.key];
       input.value = parseFloat(fromMeters(params[def.key], unit).toPrecision(4));
-      input.min = fromMeters(def.min, unit);
-      input.max = fromMeters(def.max, unit);
+      input.min = parseFloat(fromMeters(def.min, unit).toPrecision(4));
+      input.max = parseFloat(fromMeters(def.max, unit).toPrecision(4));
       input.step = parseFloat(fromMeters(def.step, unit).toPrecision(3));
       input.style.cssText = 'flex:1; min-width:0; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
 
@@ -148,8 +148,8 @@ export function createConfigPanel(container, initialParams, onChange) {
         const meters = toMeters(Number(input.value), oldUnit);
         unitPrefs[def.key] = newUnit;
         input.value = parseFloat(fromMeters(meters, newUnit).toPrecision(4));
-        input.min = fromMeters(def.min, newUnit);
-        input.max = fromMeters(def.max, newUnit);
+        input.min = parseFloat(fromMeters(def.min, newUnit).toPrecision(4));
+        input.max = parseFloat(fromMeters(def.max, newUnit).toPrecision(4));
         input.step = parseFloat(fromMeters(def.step, newUnit).toPrecision(3));
         saveUnits();
       });
