@@ -110,9 +110,114 @@ describe('checkCollisions', () => {
     expect(result.contactQuads).not.toContain(farCeil);
   });
 
-  it('returns minClearance 0 when colliding', () => {
+  it('returns negative minClearance when colliding (penetration depth)', () => {
     const result = checkCollisions(collidingOBB, [floorQuad]);
     expect(result.collides).toBe(true);
+    expect(result.minClearance).toBeLessThan(0);
+  });
+
+  it('returns no collision and minClearance 0 for empty quads array', () => {
+    const result = checkCollisions(clearOBB, []);
+    expect(result.collides).toBe(false);
     expect(result.minClearance).toBe(0);
+    expect(result.contactQuads).toHaveLength(0);
+  });
+
+  it('reports multiple contact quads when OBB hits more than one', () => {
+    // collidingOBB at origin penetrates both floor (y=0) and wall (x=1, but OBB extends to x=0.25)
+    // Use a wall at x=0 so the OBB at center [0,0,0] with halfExtent 0.25 penetrates it
+    const nearWall = {
+      type: 'wall-left',
+      vertices: [[0, -1, -1], [0, -1, 1], [0, 1, 1], [0, 1, -1]],
+      normal: [-1, 0, 0],
+    };
+    const result = checkCollisions(collidingOBB, [floorQuad, nearWall]);
+    expect(result.collides).toBe(true);
+    expect(result.contactQuads).toHaveLength(2);
+    expect(result.contactQuads).toContain(floorQuad);
+    expect(result.contactQuads).toContain(nearWall);
+  });
+});
+
+// ─── Edge-edge SAT axes ──────────────────────────────────────────────────────
+
+describe('testOBBvsQuad edge-edge separation', () => {
+  it('detects separation on cross-product axis (near-miss diagonal)', () => {
+    // A 45°-yaw OBB whose corner just misses a tilted quad.
+    // The separating axis is a cross product of OBB edge × quad edge.
+    const diagonalQuad = {
+      type: 'wall-left',
+      vertices: [[2, 0, 0], [2, 0, 2], [2, 2, 2], [2, 2, 0]],
+      normal: [-1, 0, 0],
+    };
+    // 45° yaw OBB at origin, small extents — corner reaches √2 * 0.5 ≈ 0.707 in X
+    const smallRotatedOBB = {
+      center: [0, 1, 1],
+      axes: [[SQRT_HALF, 0, -SQRT_HALF], [0, 1, 0], [SQRT_HALF, 0, SQRT_HALF]],
+      halfExtents: [0.5, 0.5, 0.5],
+    };
+    const result = testOBBvsQuad(smallRotatedOBB, diagonalQuad);
+    expect(result.collides).toBe(false);
+    expect(result.clearance).toBeGreaterThan(0);
+  });
+
+  it('detects collision when cross-product axes overlap', () => {
+    // Same quad but OBB closer — corner extends past the wall
+    const diagonalQuad = {
+      type: 'wall-left',
+      vertices: [[1, 0, 0], [1, 0, 2], [1, 2, 2], [1, 2, 0]],
+      normal: [-1, 0, 0],
+    };
+    const nearRotatedOBB = {
+      center: [0.5, 1, 1],
+      axes: [[SQRT_HALF, 0, -SQRT_HALF], [0, 1, 0], [SQRT_HALF, 0, SQRT_HALF]],
+      halfExtents: [0.5, 0.5, 0.5],
+    };
+    const result = testOBBvsQuad(nearRotatedOBB, diagonalQuad);
+    expect(result.collides).toBe(true);
+  });
+});
+
+// ─── Sloped normal ───────────────────────────────────────────────────────────
+
+describe('testOBBvsQuad with sloped surface', () => {
+  it('reports no collision for OBB below a sloped ceiling', () => {
+    // Sloped ceiling: rises from y=2.4 at z=0 to y=4.0 at z=4
+    const slopedCeil = {
+      type: 'ceiling',
+      vertices: [[-1, 2.4, 0], [1, 2.4, 0], [1, 4.0, 4], [-1, 4.0, 4]],
+      normal: (() => {
+        // cross( [2,0,0], [0,1.6,4] ) = [0*4 - 0*1.6, 0*0 - 2*4, 2*1.6 - 0*0] = [0, -8, 3.2]
+        const len = Math.sqrt(64 + 10.24);
+        return [0, -8 / len, 3.2 / len];
+      })(),
+    };
+    const belowOBB = {
+      center: [0, 1.0, 2.0],
+      axes: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      halfExtents: [0.3, 0.3, 0.3],
+    };
+    const result = testOBBvsQuad(belowOBB, slopedCeil);
+    expect(result.collides).toBe(false);
+    expect(result.clearance).toBeGreaterThan(0);
+  });
+
+  it('reports collision for OBB penetrating a sloped ceiling', () => {
+    const slopedCeil = {
+      type: 'ceiling',
+      vertices: [[-1, 2.4, 0], [1, 2.4, 0], [1, 4.0, 4], [-1, 4.0, 4]],
+      normal: (() => {
+        const len = Math.sqrt(64 + 10.24);
+        return [0, -8 / len, 3.2 / len];
+      })(),
+    };
+    // OBB right at the ceiling surface
+    const atCeilOBB = {
+      center: [0, 2.5, 0.1],
+      axes: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      halfExtents: [0.3, 0.3, 0.3],
+    };
+    const result = testOBBvsQuad(atCeilOBB, slopedCeil);
+    expect(result.collides).toBe(true);
   });
 });

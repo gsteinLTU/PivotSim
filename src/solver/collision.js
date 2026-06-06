@@ -79,7 +79,7 @@ export function testOBBvsQuad(obb, quad) {
   }
 
   if (maxGap > 0) return { collides: false, clearance: maxGap };
-  return { collides: true, clearance: 0 };
+  return { collides: true, clearance: maxGap };   // maxGap is ≤ 0 here
 }
 
 /**
@@ -97,14 +97,15 @@ export function checkCollisions(obb, collisionQuads) {
     if (result.collides) {
       collides = true;
       contactQuads.push(quad);
-    } else if (result.clearance < minClearance) {
+    }
+    if (result.clearance < minClearance) {
       minClearance = result.clearance;
     }
   }
 
   return {
     collides,
-    minClearance: collides ? 0 : (minClearance === Infinity ? 0 : minClearance),
+    minClearance: minClearance === Infinity ? 0 : minClearance,
     contactQuads,
   };
 }
