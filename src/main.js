@@ -101,8 +101,11 @@ function rebuildStairwell(params) {
   controls.update();
   updateBoxCollision();
 
-  // Stale result when geometry changes
-  if (currentTrajectory) {
+  // Stale result when geometry changes — terminate any running worker immediately
+  if (currentWorker || currentTrajectory) {
+    currentWorker?.terminate();
+    currentWorker = null;
+    panel.unlock();
     currentTrajectory = null;
     isPlaying = false;
     clearGhostTrail();
@@ -123,7 +126,8 @@ function rebuildBox() {
   updateBoxCollision();
 
   // Stale result when box dims change
-  if (currentTrajectory) {
+  if (currentWorker || currentTrajectory) {
+    cancelSolve();
     currentTrajectory = null;
     isPlaying = false;
     clearGhostTrail();
@@ -181,6 +185,7 @@ function startSolve() {
       renderGhostTrail(data.poses);
     } else {
       // 'done', 'canceled', or 'error'
+      currentWorker = null;
       panel.unlock();
       currentTrajectory = (data.poses?.length >= 2) ? data : null;
       timeline.setResult({
