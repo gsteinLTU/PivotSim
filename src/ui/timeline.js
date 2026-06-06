@@ -30,7 +30,7 @@ export function createTimeline(container, callbacks) {
           ✕ Cancel
         </button>
         <span id="tl-temp" style="${MONO}color:#64ffda;">T=5.000</span>
-        <span id="tl-iter" style="${MONO}color:#aaa;">0 / 50000</span>
+        <span id="tl-iter" style="${MONO}color:#aaa;">0 / 50,000</span>
         <div style="flex:1;height:6px;background:#1a2a3a;border-radius:3px;overflow:hidden;">
           <div id="tl-ebar" style="height:100%;width:0%;background:#64ffda;border-radius:3px;
             transition:width 0.4s;"></div>
