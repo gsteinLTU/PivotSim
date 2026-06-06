@@ -201,3 +201,99 @@ describe('loadUnitPrefs', () => {
     expect(prefs).toEqual({ stairWidth: 'm', risePerStep: 'm', x: 'm' });
   });
 });
+
+describe('stairwell config unit dropdowns', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('length fields have a unit select with options m, ft, in', () => {
+    const container = document.createElement('div');
+    createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    // stairWidth is the first length field — find its wrapper
+    const selects = Array.from(container.querySelectorAll('select'));
+    // turn selects (bottomHallwayTurn, topHallwayTurn) have value options like '0','90','-90'
+    // unit selects have 'm','ft','in'
+    const unitSelects = selects.filter((s) =>
+      Array.from(s.options).some((o) => o.value === 'in')
+    );
+    expect(unitSelects.length).toBeGreaterThan(0);
+    const opts = Array.from(unitSelects[0].options).map((o) => o.value);
+    expect(opts).toEqual(['m', 'ft', 'in']);
+  });
+
+  it('changing unit select converts the displayed value', () => {
+    const container = document.createElement('div');
+    createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+    const selects = Array.from(container.querySelectorAll('select'));
+    const unitSelects = selects.filter((s) =>
+      Array.from(s.options).some((o) => o.value === 'in')
+    );
+    const firstSelect = unitSelects[0]; // stairWidth unit select
+    const numberInput = firstSelect.closest('div').querySelector('input[type="number"]');
+
+    // default stairWidth is 1.0 m
+    expect(Number(numberInput.value)).toBeCloseTo(1.0);
+
+    firstSelect.value = 'in';
+    firstSelect.dispatchEvent(new Event('change'));
+
+    // 1.0 m = 39.3701 in
+    expect(Number(numberInput.value)).toBeCloseTo(39.37, 1);
+  });
+
+  it('onChange callback receives meters regardless of display unit', async () => {
+    const container = document.createElement('div');
+    const onChange = vi.fn();
+    createConfigPanel(container, { ...DEFAULTS }, onChange);
+
+    const selects = Array.from(container.querySelectorAll('select'));
+    const unitSelects = selects.filter((s) =>
+      Array.from(s.options).some((o) => o.value === 'in')
+    );
+    const firstSelect = unitSelects[0];
+    const numberInput = firstSelect.closest('div').querySelector('input[type="number"]');
+
+    firstSelect.value = 'in';
+    firstSelect.dispatchEvent(new Event('change'));
+
+    // type 39.3701 in (= 1.0 m)
+    numberInput.value = '39.3701';
+    numberInput.dispatchEvent(new Event('input'));
+
+    await new Promise((r) => setTimeout(r, 150));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ stairWidth: expect.closeTo(1.0, 3) })
+    );
+  });
+
+  it('persists unit selection to localStorage', () => {
+    const container = document.createElement('div');
+    createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+
+    const selects = Array.from(container.querySelectorAll('select'));
+    const unitSelects = selects.filter((s) =>
+      Array.from(s.options).some((o) => o.value === 'in')
+    );
+    unitSelects[0].value = 'ft';
+    unitSelects[0].dispatchEvent(new Event('change'));
+
+    const stored = JSON.parse(localStorage.getItem('pivotsim_unit_prefs'));
+    expect(stored.stairWidth).toBe('ft');
+  });
+
+  it('restores unit selection from localStorage on init', () => {
+    localStorage.setItem('pivotsim_unit_prefs', JSON.stringify({ stairWidth: 'in' }));
+    const container = document.createElement('div');
+    createConfigPanel(container, { ...DEFAULTS }, vi.fn());
+
+    const selects = Array.from(container.querySelectorAll('select'));
+    const unitSelects = selects.filter((s) =>
+      Array.from(s.options).some((o) => o.value === 'in')
+    );
+    expect(unitSelects[0].value).toBe('in');
+    const numberInput = unitSelects[0].closest('div').querySelector('input[type="number"]');
+    // stairWidth default 1.0 m shown in inches
+    expect(Number(numberInput.value)).toBeCloseTo(39.37, 1);
+  });
+});

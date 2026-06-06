@@ -33,25 +33,25 @@ export function loadUnitPrefs(validKeys) {
 }
 
 const FIELD_DEFS = [
-  { key: 'stairWidth', label: 'Stair Width (m)', type: 'number', min: 0.5, max: 3, step: 0.05 },
-  { key: 'numSteps', label: 'Number of Steps', type: 'number', min: 1, max: 30, step: 1 },
-  { key: 'risePerStep', label: 'Rise per Step (m)', type: 'number', min: 0.1, max: 0.4, step: 0.01 },
-  { key: 'runPerStep', label: 'Run per Step (m)', type: 'number', min: 0.15, max: 0.5, step: 0.01 },
-  { key: 'bottomHallwayWidth', label: 'Bottom Hallway Width (m)', type: 'number', min: 0.5, max: 3, step: 0.05 },
-  { key: 'bottomHallwayTurn', label: 'Bottom Hallway Turn', type: 'select', options: [
-    { value: 0, label: 'Straight (0°)' },
-    { value: 90, label: 'Right (90°)' },
-    { value: -90, label: 'Left (-90°)' },
+  { key: 'stairWidth',        label: 'Stair Width',          type: 'number', hasUnit: true,  min: 0.5,  max: 3,   step: 0.05 },
+  { key: 'numSteps',          label: 'Number of Steps',      type: 'number', hasUnit: false, min: 1,    max: 30,  step: 1    },
+  { key: 'risePerStep',       label: 'Rise per Step',        type: 'number', hasUnit: true,  min: 0.1,  max: 0.4, step: 0.01 },
+  { key: 'runPerStep',        label: 'Run per Step',         type: 'number', hasUnit: true,  min: 0.15, max: 0.5, step: 0.01 },
+  { key: 'bottomHallwayWidth',label: 'Bottom Hallway Width', type: 'number', hasUnit: true,  min: 0.5,  max: 3,   step: 0.05 },
+  { key: 'bottomHallwayTurn', label: 'Bottom Hallway Turn',  type: 'select', hasUnit: false, options: [
+    { value: 0,   label: 'Straight (0°)' },
+    { value: 90,  label: 'Right (90°)'   },
+    { value: -90, label: 'Left (-90°)'   },
   ]},
-  { key: 'topHallwayWidth', label: 'Top Hallway Width (m)', type: 'number', min: 0.5, max: 3, step: 0.05 },
-  { key: 'topHallwayTurn', label: 'Top Hallway Turn', type: 'select', options: [
-    { value: 0, label: 'Straight (0°)' },
-    { value: 90, label: 'Right (90°)' },
-    { value: -90, label: 'Left (-90°)' },
+  { key: 'topHallwayWidth',   label: 'Top Hallway Width',    type: 'number', hasUnit: true,  min: 0.5,  max: 3,   step: 0.05 },
+  { key: 'topHallwayTurn',    label: 'Top Hallway Turn',     type: 'select', hasUnit: false, options: [
+    { value: 0,   label: 'Straight (0°)' },
+    { value: 90,  label: 'Right (90°)'   },
+    { value: -90, label: 'Left (-90°)'   },
   ]},
-  { key: 'ceilingHeight', label: 'Ceiling Height (m)', type: 'number', min: 1.8, max: 4, step: 0.05 },
-  { key: 'slopedCeiling', label: 'Sloped Ceiling', type: 'checkbox' },
-  { key: 'hallwayLength', label: 'Hallway Length (m)', type: 'number', min: 1, max: 6, step: 0.1 },
+  { key: 'ceilingHeight',     label: 'Ceiling Height',       type: 'number', hasUnit: true,  min: 1.8,  max: 4,   step: 0.05 },
+  { key: 'slopedCeiling',     label: 'Sloped Ceiling',       type: 'checkbox', hasUnit: false },
+  { key: 'hallwayLength',     label: 'Hallway Length',       type: 'number', hasUnit: true,  min: 1,    max: 6,   step: 0.1  },
 ];
 
 export function createConfigPanel(container, initialParams, onChange) {
@@ -63,6 +63,18 @@ export function createConfigPanel(container, initialParams, onChange) {
   let boxPoseCallback = null;
   const boxDims = { ...BOX_DEFAULTS };
   const boxPose = { ...BOX_POSE_DEFAULTS };
+
+  const STAIRWELL_UNIT_KEYS = FIELD_DEFS.filter((d) => d.hasUnit).map((d) => d.key);
+  const ALL_UNIT_KEYS = [
+    ...STAIRWELL_UNIT_KEYS,
+    'boxLength', 'boxWidth', 'boxHeight',
+    'x', 'y', 'z',
+  ];
+  const unitPrefs = loadUnitPrefs(ALL_UNIT_KEYS);
+
+  function saveUnits() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(unitPrefs)); } catch { /* ignore */ }
+  }
 
   const title = document.createElement('h2');
   title.textContent = 'Stairwell Config';
@@ -78,10 +90,9 @@ export function createConfigPanel(container, initialParams, onChange) {
     label.style.cssText = 'display:block; font-size:12px; margin-bottom:4px; color:#aaa;';
     wrapper.appendChild(label);
 
-    let input;
-
     if (def.type === 'select') {
-      input = document.createElement('select');
+      const input = document.createElement('select');
+      input.style.cssText = 'width:100%; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
       for (const opt of def.options) {
         const option = document.createElement('option');
         option.value = opt.value;
@@ -93,16 +104,62 @@ export function createConfigPanel(container, initialParams, onChange) {
         params[def.key] = Number(input.value);
         scheduleUpdate();
       });
+      wrapper.appendChild(input);
     } else if (def.type === 'checkbox') {
-      input = document.createElement('input');
+      const input = document.createElement('input');
       input.type = 'checkbox';
       input.checked = params[def.key];
       input.addEventListener('change', () => {
         params[def.key] = input.checked;
         scheduleUpdate();
       });
+      wrapper.appendChild(input);
+    } else if (def.hasUnit) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:6px;';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      const unit = unitPrefs[def.key];
+      input.value = parseFloat(fromMeters(params[def.key], unit).toPrecision(4));
+      input.min = fromMeters(def.min, unit);
+      input.max = fromMeters(def.max, unit);
+      input.step = parseFloat(fromMeters(def.step, unit).toPrecision(3));
+      input.style.cssText = 'flex:1; min-width:0; padding:4px 8px; background:#0d1b2a; color:#e0e0e0; border:1px solid #334; border-radius:4px;';
+
+      const unitSel = document.createElement('select');
+      unitSel.style.cssText = 'background:#0d1b2a; color:#64ffda; border:1px solid #334; border-radius:4px; padding:2px 4px; font-size:11px;';
+      for (const u of ['m', 'ft', 'in']) {
+        const o = document.createElement('option');
+        o.value = u;
+        o.textContent = u;
+        if (u === unit) o.selected = true;
+        unitSel.appendChild(o);
+      }
+
+      input.addEventListener('input', () => {
+        params[def.key] = toMeters(Number(input.value), unitPrefs[def.key]);
+        scheduleUpdate();
+      });
+
+      unitSel.addEventListener('change', () => {
+        const oldUnit = unitPrefs[def.key];
+        const newUnit = unitSel.value;
+        const meters = toMeters(Number(input.value), oldUnit);
+        unitPrefs[def.key] = newUnit;
+        input.value = parseFloat(fromMeters(meters, newUnit).toPrecision(4));
+        input.min = fromMeters(def.min, newUnit);
+        input.max = fromMeters(def.max, newUnit);
+        input.step = parseFloat(fromMeters(def.step, newUnit).toPrecision(3));
+        saveUnits();
+      });
+
+      row.appendChild(input);
+      row.appendChild(unitSel);
+      wrapper.appendChild(row);
     } else {
-      input = document.createElement('input');
+      // Plain number (numSteps)
+      const input = document.createElement('input');
       input.type = 'number';
       input.value = params[def.key];
       input.min = def.min;
@@ -113,9 +170,9 @@ export function createConfigPanel(container, initialParams, onChange) {
         params[def.key] = Number(input.value);
         scheduleUpdate();
       });
+      wrapper.appendChild(input);
     }
 
-    wrapper.appendChild(input);
     container.appendChild(wrapper);
   }
 
