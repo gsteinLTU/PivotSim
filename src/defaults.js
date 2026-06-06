@@ -13,15 +13,15 @@ export const DEFAULTS = {
 };
 
 export const BOX_DEFAULTS = {
-  length: 2.0,   // m, longest dimension (runs along stairwell Z axis at rest)
+  length: 0.5,   // m, longest dimension (runs along stairwell Z axis at rest)
   width: 0.8,    // m, horizontal cross-section
-  height: 0.5,   // m, vertical dimension
+  height: 1.2,   // m, vertical dimension
 };
 
 export const BOX_POSE_DEFAULTS = {
-  x: 0.0,
-  y: 0.25,    // half of default height — box sits on floor
-  z: -1.0,    // 1m into bottom hallway
+  x: 0.1,
+  y: 0.65,     // half of default height — box sits on floor
+  z: -0.8,    // 1m into bottom hallway
   yaw: 0,     // degrees, rotation around Y (vertical) axis
   pitch: 0,   // degrees, rotation around X axis
   roll: 0,    // degrees, rotation around Z axis

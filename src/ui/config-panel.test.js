@@ -71,16 +71,16 @@ describe('createConfigPanel', () => {
   it('getBoxDims returns default box dimensions', () => {
     const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
     const dims = panel.getBoxDims();
-    expect(dims.length).toBe(2.0);
-    expect(dims.width).toBe(0.8);
-    expect(dims.height).toBe(0.5);
+    expect(dims.length).toBe(BOX_DEFAULTS.length);
+    expect(dims.width).toBe(BOX_DEFAULTS.width);
+    expect(dims.height).toBe(BOX_DEFAULTS.height);
   });
 
   it('getBoxPose returns default box pose', () => {
     const panel = createConfigPanel(document.createElement('div'), { ...DEFAULTS }, vi.fn());
     const pose = panel.getBoxPose();
-    expect(pose.y).toBeCloseTo(0.25);
-    expect(pose.z).toBeCloseTo(-1.0);
+    expect(pose.y).toBeCloseTo(BOX_POSE_DEFAULTS.y);
+    expect(pose.z).toBeCloseTo(BOX_POSE_DEFAULTS.z);
     expect(pose.yaw).toBe(0);
   });
 
