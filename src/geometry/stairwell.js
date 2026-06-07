@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 
 /**
- * Each collision quad: { type, vertices: [[x,y,z], ...], normal: [nx,ny,nz] }
+ * Each collision quad: { type, segment, vertices: [[x,y,z], ...], normal: [nx,ny,nz] }
+ * segment: 'stair' | 'bottom-hall' | 'top-hall'
  * Vertices are in counter-clockwise order when viewed from the normal direction.
  */
 

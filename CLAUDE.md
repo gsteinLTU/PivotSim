@@ -42,9 +42,10 @@ Axes are unit vectors (local X/Y/Z in world space). `halfExtents` ordering match
 
 **Collision quad format** (used by the solver):
 ```js
-{ type: string, vertices: [[x,y,z], [x,y,z], [x,y,z], [x,y,z]], normal: [nx, ny, nz] }
+{ type: string, segment: string, vertices: [[x,y,z], [x,y,z], [x,y,z], [x,y,z]], normal: [nx, ny, nz] }
 ```
 Types: `tread`, `riser`, `wall-left`, `wall-right`, `ceiling`, `floor`
+Segments: `stair`, `bottom-hall`, `top-hall`
 
 **Stairwell coordinate system:** stairs run along +Z, rise along +Y, width along X. Bottom hallway attaches at (0,0,0); top hallway attaches at (0, totalRise, totalRun).
 
