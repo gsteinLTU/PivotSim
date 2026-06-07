@@ -24,10 +24,14 @@ PivotSim is a browser-based 3D tool for simulating moving furniture up staircase
 | `src/geometry/stairwell.js` | `buildStairwell(params)` | Builds Three.js meshes + collision quads from params |
 | `src/geometry/box.js` | `createBoxMesh`, `updateBoxMeshPose`, `computeOBB`, `getOBBCorners`, `getHalfExtents` | Box mesh creation and OBB math (pure, no Three.js in math fns) |
 | `src/solver/collision.js` | `testOBBvsQuad`, `checkCollisions` | SAT collision detection — pure JS, no Three.js dependency |
-| `src/solver/utils.js` | `euclideanDelta`, `angularDelta`, `segmentDuration`, `lerpPose`, `applyRotationPropagation`, `MAX_LINEAR_SPEED`, `MAX_ANGULAR_SPEED` | Pure pose-math shared across all planners |
-| `src/solver/path.js` | `buildCenterline`, `getEndpoints`, `buildContainmentOBBs` | Builds stairwell centerline polyline and containment OBBs for trajectory solver |
-| `src/solver/trajectory.js` | `optimizeTrajectory`, `evalSegment`, `DEFAULT_WEIGHTS` | Trajectory optimizer — simulated-annealing over 6-DOF box poses |
-| `src/solver/worker.js` | — | Web Worker wrapper for `optimizeTrajectory`; accepts `start`/`cancel` messages |
+| `src/solver/utils.js` | `euclideanDelta`, `angularDelta`, `segmentDuration`, `lerpPose`, `applyRotationPropagation`, `computeOBBFromPose`, `MAX_LINEAR_SPEED`, `MAX_ANGULAR_SPEED` | Pure pose-math shared across all planners |
+| `src/solver/path.js` | `buildCenterline`, `getEndpoints`, `buildContainmentOBBs`, `getSegmentBoundaries` | Builds stairwell centerline polyline, containment OBBs, and segment boundary poses |
+| `src/solver/gateway.js` | `findGatewayConfigs`, `bestGatewayConfig` | Sweeps orientation grid at segment transitions to find collision-free gateway poses |
+| `src/solver/context.js` | `buildPlannerContext(stairwellParams, boxDims)` | Assembles all planner inputs (quads, centerline, OBBs, start/end poses) into one context object |
+| `src/solver/trajectory.js` | `buildTrajectory(poses)` | Converts a pose array into a timed trajectory |
+| `src/solver/planners/sa.js` | `DEFAULT_WEIGHTS`, `evalSegment`, `saPlanner` | Simulated-annealing planner over 6-DOF box poses |
+| `src/solver/planners/rrt-connect.js` | `DEFAULTS`, `rrtPlanner` | RRT-Connect planner; samples gateway-biased poses and grows bidirectional trees |
+| `src/solver/worker.js` | — | Web Worker wrapper; dispatches to `saPlanner` or `rrtPlanner` via `plannerType`; accepts `start`/`cancel` messages |
 | `src/viewer/scene.js` | `createScene(container)` | Sets up Three.js scene, camera, renderer, OrbitControls |
 | `src/viewer/debug.js` | `buildQuadDebug(quads)` | Builds colored wireframe + normal arrows for collision quad visualization |
 | `src/ui/config-panel.js` | `createConfigPanel(container, params, onChange)` | Renders all parameter inputs, debounced onChange |
@@ -60,5 +64,6 @@ Segments: `stair`, `bottom-hall`, `top-hall`
 - **Phase 0+1** ✅ — Scaffold + stairwell geometry visualizer
 - **Phase 1.5** ✅ — Box model (`src/geometry/box.js`) + SAT collision detector (`src/solver/collision.js`); manual box placement with real-time collision feedback
 - **Phase 2** ✅ — Trajectory solver (`src/solver/trajectory.js`) + timeline UI (`src/ui/timeline.js`)
+- **Phase 3** ✅ — Dual-planner architecture: SA refactored to `planners/sa.js`; RRT-Connect planner added (`planners/rrt-connect.js`); gateway pose pre-computation (`gateway.js`); shared planner context (`context.js`)
 
 Full spec: `docs/superpowers/specs/2026-06-05-pivotsim-design.md`
