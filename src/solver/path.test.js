@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCenterline, getEndpoints, buildContainmentOBBs } from './path.js';
+import { buildCenterline, getEndpoints, buildContainmentOBBs, getSegmentBoundaries } from './path.js';
 import { DEFAULTS } from '../defaults.js';
 
 describe('buildCenterline', () => {
@@ -104,5 +104,31 @@ describe('buildContainmentOBBs', () => {
       );
     });
     expect(inside).toBe(false);
+  });
+});
+
+describe('getSegmentBoundaries', () => {
+  it('returns correct indices for standard params', () => {
+    const cl = buildCenterline(DEFAULTS);
+    const b = getSegmentBoundaries(cl);
+    expect(b.bottomTransitionIdx).toBe(1);
+    expect(b.topTransitionIdx).toBe(cl.points.length - 2);
+  });
+
+  it('bottomTransitionPt is at the stair base [0, 0, 0]', () => {
+    const cl = buildCenterline(DEFAULTS);
+    const { bottomTransitionPt } = getSegmentBoundaries(cl);
+    expect(bottomTransitionPt[0]).toBeCloseTo(0, 5);
+    expect(bottomTransitionPt[1]).toBeCloseTo(0, 5);
+    expect(bottomTransitionPt[2]).toBeCloseTo(0, 5);
+  });
+
+  it('topTransitionPt matches total rise and run', () => {
+    const cl = buildCenterline(DEFAULTS);
+    const { topTransitionPt } = getSegmentBoundaries(cl);
+    const totalRise = DEFAULTS.numSteps * DEFAULTS.risePerStep;
+    const totalRun  = DEFAULTS.numSteps * DEFAULTS.runPerStep;
+    expect(topTransitionPt[1]).toBeCloseTo(totalRise, 4);
+    expect(topTransitionPt[2]).toBeCloseTo(totalRun, 4);
   });
 });

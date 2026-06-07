@@ -148,3 +148,18 @@ export function buildContainmentOBBs(centerline, params) {
 
   return [stairOBB, bottomOBB, topOBB].filter(Boolean);
 }
+
+/**
+ * Returns the centerline indices and world positions of the two segment
+ * transition points (stair base and stair top junctions).
+ */
+export function getSegmentBoundaries(centerline) {
+  const { points } = centerline;
+  const n = points.length;
+  return {
+    bottomTransitionIdx: 1,
+    topTransitionIdx:    n - 2,
+    bottomTransitionPt:  points[1],
+    topTransitionPt:     points[n - 2],
+  };
+}

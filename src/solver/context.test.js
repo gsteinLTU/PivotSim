@@ -49,4 +49,37 @@ describe('buildPlannerContext', () => {
     expect(ctx.halfExtents[1]).toBeCloseTo(BOX_DEFAULTS.height / 2, 5);
     expect(ctx.halfExtents[2]).toBeCloseTo(BOX_DEFAULTS.length / 2, 5);
   });
+
+  it('returns quadsBySegment with stair, bottom-hall, top-hall keys', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
+    expect(ctx.quadsBySegment).toBeDefined();
+    expect(Array.isArray(ctx.quadsBySegment.stair)).toBe(true);
+    expect(Array.isArray(ctx.quadsBySegment['bottom-hall'])).toBe(true);
+    expect(Array.isArray(ctx.quadsBySegment['top-hall'])).toBe(true);
+    expect(ctx.quadsBySegment.stair.length).toBeGreaterThan(0);
+    expect(ctx.quadsBySegment['bottom-hall'].length).toBeGreaterThan(0);
+    expect(ctx.quadsBySegment['top-hall'].length).toBeGreaterThan(0);
+  });
+
+  it('quadsBySegment partitions all collisionQuads with no overlap', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
+    const total = ctx.quadsBySegment.stair.length
+      + ctx.quadsBySegment['bottom-hall'].length
+      + ctx.quadsBySegment['top-hall'].length;
+    expect(total).toBe(ctx.collisionQuads.length);
+  });
+
+  it('returns stairZone with zMin, zMax, yMax', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
+    expect(typeof ctx.stairZone.zMin).toBe('number');
+    expect(typeof ctx.stairZone.zMax).toBe('number');
+    expect(typeof ctx.stairZone.yMax).toBe('number');
+    expect(ctx.stairZone.zMax).toBeCloseTo(DEFAULTS.numSteps * DEFAULTS.runPerStep, 4);
+  });
+
+  it('returns boundaries with transition points', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
+    expect(Array.isArray(ctx.boundaries.bottomTransitionPt)).toBe(true);
+    expect(Array.isArray(ctx.boundaries.topTransitionPt)).toBe(true);
+  });
 });
