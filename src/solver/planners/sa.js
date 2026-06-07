@@ -217,15 +217,20 @@ export const saPlanner = {
         }
 
         if (worstIdx === -1) {
-          // No stair-zone segment is worst; fall back to single-DOF perturbation
-          const i   = 1 + Math.floor(Math.random() * (poses.length - 2));
-          const dof = DOFS[Math.floor(Math.random() * 6)];
-          newPoses    = poses.map(p => ({ ...p }));
-          newPoses[i] = clampPose({ ...poses[i], [dof]: poses[i][dof] + randn() * SIGMA[dof] * T });
-          newSegData   = segData.slice();
-          newSegData[i - 1] = evalSegment(newPoses[i - 1], newPoses[i],     collisionQuads, halfExtents, obbs);
-          newSegData[i]     = evalSegment(newPoses[i],     newPoses[i + 1], collisionQuads, halfExtents, obbs);
-          newEnergy = totalEnergy(newSegData, newPoses, w);
+          if (poses.length >= 3) {
+            const i   = 1 + Math.floor(Math.random() * (poses.length - 2));
+            const dof = DOFS[Math.floor(Math.random() * 6)];
+            newPoses    = poses.map(p => ({ ...p }));
+            newPoses[i] = clampPose({ ...poses[i], [dof]: poses[i][dof] + randn() * SIGMA[dof] * T });
+            newSegData   = segData.slice();
+            newSegData[i - 1] = evalSegment(newPoses[i - 1], newPoses[i],     collisionQuads, halfExtents, obbs);
+            newSegData[i]     = evalSegment(newPoses[i],     newPoses[i + 1], collisionQuads, halfExtents, obbs);
+            newEnergy = totalEnergy(newSegData, newPoses, w);
+          } else {
+            newPoses   = poses;
+            newSegData = segData;
+            newEnergy  = energy;
+          }
         } else {
           let mid = lerpPose(poses[worstIdx], poses[worstIdx + 1], 0.5);
           for (const dof of DOFS) mid[dof] += randn() * SIGMA[dof] * T * 0.5;
