@@ -12,7 +12,7 @@ export const DEFAULT_WEIGHTS = {
 const CLEARANCE_CAP = 0.3;
 const DOFS          = ['x', 'y', 'z', 'yaw', 'pitch', 'roll'];
 const ROTATION_DOFS = ['yaw', 'pitch', 'roll'];
-const SIGMA         = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.3, pitch: 0.2, roll: 0.2 };
+const SIGMA         = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.6, pitch: 0.5, roll: 0.25 };
 
 function randn() {
   const u = 1 - Math.random(), v = Math.random();
@@ -93,7 +93,7 @@ export const saPlanner = {
   async plan(context, config, onProgress, shouldCancel) {
     const {
       collisionQuads, halfExtents, startPose, endPose, containmentOBBs, centerline,
-      quadsBySegment, boundaries, stairZone,
+      quadsBySegment, boundaries,
     } = context;
     const w        = { ...DEFAULT_WEIGHTS, ...(config ?? {}) };
     const MAX_ITER = config?.maxIter ?? 50000;
@@ -201,13 +201,8 @@ export const saPlanner = {
         newEnergy = totalEnergy(newSegData, newPoses, w);
 
       } else if (r < 0.90 || poses.length <= 2) {
-        const zone = stairZone ?? { zMin: -Infinity, zMax: Infinity };
-
-        // Only insert waypoints within the stair zone; skip hallway segments
         let worstIdx = -1;
         for (let i = 0; i < segData.length; i++) {
-          const midZ = (poses[i].z + poses[i + 1].z) / 2;
-          if (midZ < zone.zMin || midZ > zone.zMax) continue;
           if (worstIdx === -1 ||
               segData[i].collEnergy > segData[worstIdx].collEnergy ||
              (segData[i].collEnergy === segData[worstIdx].collEnergy &&
@@ -216,22 +211,7 @@ export const saPlanner = {
           }
         }
 
-        if (worstIdx === -1) {
-          if (poses.length >= 3) {
-            const i   = 1 + Math.floor(Math.random() * (poses.length - 2));
-            const dof = DOFS[Math.floor(Math.random() * 6)];
-            newPoses    = poses.map(p => ({ ...p }));
-            newPoses[i] = clampPose({ ...poses[i], [dof]: poses[i][dof] + randn() * SIGMA[dof] * T });
-            newSegData   = segData.slice();
-            newSegData[i - 1] = evalSegment(newPoses[i - 1], newPoses[i],     collisionQuads, halfExtents, obbs);
-            newSegData[i]     = evalSegment(newPoses[i],     newPoses[i + 1], collisionQuads, halfExtents, obbs);
-            newEnergy = totalEnergy(newSegData, newPoses, w);
-          } else {
-            newPoses   = poses;
-            newSegData = segData;
-            newEnergy  = energy;
-          }
-        } else {
+        if (worstIdx !== -1) {
           let mid = lerpPose(poses[worstIdx], poses[worstIdx + 1], 0.5);
           for (const dof of DOFS) mid[dof] += randn() * SIGMA[dof] * T * 0.5;
           mid = clampPose(mid);

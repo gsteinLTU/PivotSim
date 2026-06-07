@@ -8,7 +8,8 @@ import { checkCollisions } from './solver/collision.js';
 import { DEFAULTS, BOX_DEFAULTS, BOX_POSE_DEFAULTS } from './defaults.js';
 import { createTimeline } from './ui/timeline.js';
 import { lerpPose } from './solver/utils.js';
-import { saPlanner } from './solver/planners/sa.js';
+import { saPlanner }  from './solver/planners/sa.js';
+import { rrtPlanner } from './solver/planners/rrt-connect.js';
 
 const DEG = Math.PI / 180;
 const MAX_GHOST = 20;
@@ -182,7 +183,8 @@ function startSolve() {
   currentWorker = new Worker(new URL('./solver/worker.js', import.meta.url), { type: 'module' });
   currentWorker.onmessage = ({ data }) => {
     if (data.type === 'progress') {
-      timeline.updateProgress(data, saPlanner.formatProgress);
+      const fmt = data.plannerType === 'rrt' ? rrtPlanner.formatProgress : saPlanner.formatProgress;
+      timeline.updateProgress(data, fmt);
       renderGhostTrail(data.poses);
     } else {
       // 'done', 'canceled', or 'error'
@@ -199,9 +201,10 @@ function startSolve() {
     }
   };
   currentWorker.postMessage({
-    type: 'start',
+    type:            'start',
+    plannerType:     'rrt',
     stairwellParams: panel.getParams(),
-    boxDims: currentBoxDims,
+    boxDims:         currentBoxDims,
   });
 }
 
@@ -275,6 +278,8 @@ const timeline = createTimeline(timelineContainer, {
 });
 
 // ── Initial build ──────────────────────────────────────────────────────────
+currentBoxDims = panel.getBoxDims();
+currentBoxPose = panel.getBoxPose();
 rebuildStairwell(panel.getParams());
 rebuildBox();
 readout.style.display = 'block';

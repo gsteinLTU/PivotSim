@@ -1,8 +1,9 @@
 import { saPlanner }          from './planners/sa.js';
+import { rrtPlanner }         from './planners/rrt-connect.js';
 import { buildPlannerContext } from './context.js';
 import { buildTrajectory }     from './trajectory.js';
 
-const PLANNERS = { sa: saPlanner };
+const PLANNERS = { sa: saPlanner, rrt: rrtPlanner };
 let cancelFlag = false;
 
 self.onmessage = async ({ data }) => {

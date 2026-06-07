@@ -37,8 +37,9 @@ export function findGatewayConfigs(transitionPt, ceilingHeight, quadsA, quadsB, 
 }
 
 /**
- * Picks the gateway config with the smallest total angular magnitude
- * (most upright / least rotated from neutral), as a good SA starting point.
+ * Picks the gateway config most likely to lead to a successful plan.
+ * Primary criterion: most level (min pitch² + roll²) — horizontal hallways don't need tilt.
+ * Secondary criterion: min yaw² (wrapped to [-π, π]) — prefer corridor-aligned over arbitrary spin.
  * Returns null if configs is empty.
  */
 export function bestGatewayConfig(configs) {
@@ -46,8 +47,8 @@ export function bestGatewayConfig(configs) {
   return configs.reduce((best, c) => {
     const yw = c.yaw > Math.PI ? c.yaw - 2 * Math.PI : c.yaw;
     const byw = best.yaw > Math.PI ? best.yaw - 2 * Math.PI : best.yaw;
-    const score = yw * yw + c.pitch * c.pitch + c.roll * c.roll;
-    const bscore = byw * byw + best.pitch * best.pitch + best.roll * best.roll;
+    const score  = c.pitch * c.pitch    + c.roll * c.roll    + 0.1 * yw  * yw;
+    const bscore = best.pitch * best.pitch + best.roll * best.roll + 0.1 * byw * byw;
     return score < bscore ? c : best;
   });
 }

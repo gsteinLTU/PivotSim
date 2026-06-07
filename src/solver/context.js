@@ -26,13 +26,8 @@ export function buildPlannerContext(stairwellParams, boxDims) {
     'top-hall':    collisionQuads.filter(q => q.segment === 'top-hall'),
   };
 
-  const stairZone = {
-    zMin: 0,  // stair base is always at z=0 in this coordinate system
-    zMax: boundaries.topTransitionPt[2],
-  };
-
   return {
     collisionQuads, halfExtents, startPose, endPose, containmentOBBs, centerline,
-    quadsBySegment, boundaries, stairZone,
+    quadsBySegment, boundaries,
   };
 }

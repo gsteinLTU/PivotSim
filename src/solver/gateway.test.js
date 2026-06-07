@@ -60,7 +60,7 @@ describe('bestGatewayConfig', () => {
     expect(bestGatewayConfig([])).toBeNull();
   });
 
-  it('returns the config with smallest total angular magnitude', () => {
+  it('returns the most level config (min pitch²+roll², then min yaw²)', () => {
     const configs = [
       { x: 0, y: 1, z: 0, yaw: 1.5,  pitch: 0.8,  roll: 0.5  },
       { x: 0, y: 1, z: 0, yaw: 0.1,  pitch: 0.1,  roll: 0.05 },

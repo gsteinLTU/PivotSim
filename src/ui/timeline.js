@@ -38,11 +38,14 @@ export function createTimeline(container, callbacks) {
     const { fits, poses, segmentTimes: st, totalTime: tt, tightestIndex } = data ?? {};
     totalTime = tt ?? 0;
 
+    const noPathFound = fits === false && poses?.length <= 2;
     const banner = fits === true
       ? `<span style="color:#22ff88;">✓ Box fits!</span>`
-      : fits === false
-        ? `<span style="color:#ffaa00;">~ Best trajectory found — may still collide</span>`
-        : `<span style="color:#888;">~ Canceled — partial result</span>`;
+      : noPathFound
+        ? `<span style="color:#ff4444;">✕ No path found — increase iterations or adjust parameters</span>`
+        : fits === false
+          ? `<span style="color:#ffaa00;">~ Best trajectory found — may still collide</span>`
+          : `<span style="color:#888;">~ Canceled — partial result</span>`;
 
     let keyframeHTML = '';
     if (poses && st && totalTime > 0) {

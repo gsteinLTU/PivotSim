@@ -77,7 +77,22 @@ describe('createTimeline', () => {
     expect(container.textContent).not.toMatch(/may still/i);
   });
 
-  it('done state with fits=false shows warning banner', () => {
+  it('done state with fits=false and multiple poses shows "may still collide" banner', () => {
+    const container = makeContainer();
+    const tl = createTimeline(container, {
+      onSolve: vi.fn(), onCancel: vi.fn(), onPlayheadChange: vi.fn(),
+      onPlayToggle: vi.fn(), onSpeedChange: vi.fn(), onReset: vi.fn(),
+    });
+    tl.setState('done', { fits: false, tightestIndex: 0, poses: [
+      { x:0,y:0,z:0,yaw:0,pitch:0,roll:0 },
+      { x:0,y:0,z:0.5,yaw:0,pitch:0,roll:0 },
+      { x:0,y:0,z:1,yaw:0,pitch:0,roll:0 },
+    ], segmentTimes: [1, 1], totalTime: 2 });
+    expect(container.textContent).toMatch(/may still/i);
+    expect(container.textContent).not.toMatch(/✓/);
+  });
+
+  it('done state with fits=false and only 2 poses shows "no path found" banner', () => {
     const container = makeContainer();
     const tl = createTimeline(container, {
       onSolve: vi.fn(), onCancel: vi.fn(), onPlayheadChange: vi.fn(),
@@ -87,7 +102,8 @@ describe('createTimeline', () => {
       { x:0,y:0,z:0,yaw:0,pitch:0,roll:0 },
       { x:0,y:0,z:1,yaw:0,pitch:0,roll:0 },
     ], segmentTimes: [2], totalTime: 2 });
-    expect(container.textContent).toMatch(/may still/i);
+    expect(container.textContent).toMatch(/no path found/i);
+    expect(container.textContent).not.toMatch(/may still/i);
     expect(container.textContent).not.toMatch(/✓/);
   });
 
