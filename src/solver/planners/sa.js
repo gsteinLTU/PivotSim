@@ -1,6 +1,7 @@
 import { checkCollisions } from '../collision.js';
 import {
   euclideanDelta, angularDelta, segmentDuration, lerpPose, applyRotationPropagation,
+  computeOBBFromPose,
 } from '../utils.js';
 
 export const DEFAULT_WEIGHTS = {
@@ -11,21 +12,6 @@ const CLEARANCE_CAP = 0.3;
 const DOFS          = ['x', 'y', 'z', 'yaw', 'pitch', 'roll'];
 const ROTATION_DOFS = ['yaw', 'pitch', 'roll'];
 const SIGMA         = { x: 0.1, y: 0.1, z: 0.1, yaw: 0.3, pitch: 0.2, roll: 0.2 };
-
-function computeOBB({ x, y, z, yaw, pitch, roll }, halfExtents) {
-  const cy = Math.cos(yaw),   sy = Math.sin(yaw);
-  const cp = Math.cos(pitch), sp = Math.sin(pitch);
-  const cr = Math.cos(roll),  sr = Math.sin(roll);
-  return {
-    center: [x, y, z],
-    axes: [
-      [ cy*cr + sy*sp*sr,  cp*sr, -sy*cr + cy*sp*sr ],
-      [-cy*sr + sy*sp*cr,  cp*cr,  sy*sr + cy*sp*cr ],
-      [ sy*cp,            -sp,     cy*cp             ],
-    ],
-    halfExtents,
-  };
-}
 
 function randn() {
   const u = 1 - Math.random(), v = Math.random();
@@ -59,7 +45,7 @@ export function evalSegment(a, b, collisionQuads, halfExtents, containmentOBBs) 
   for (let k = 0; k < K; k++) {
     const t    = (k + 0.5) / K;
     const pose = lerpPose(a, b, t);
-    const { minClearance } = checkCollisions(computeOBB(pose, halfExtents), collisionQuads);
+    const { minClearance } = checkCollisions(computeOBBFromPose(pose, halfExtents), collisionQuads);
     clearances.push(minClearance);
     if (minClearance < worstC) { worstC = minClearance; worstT = t; }
 
@@ -74,7 +60,7 @@ export function evalSegment(a, b, collisionQuads, halfExtents, containmentOBBs) 
     for (const s of [-1, 1]) {
       const t = Math.max(0.01, Math.min(0.99, worstT + s * (r / 5) * halfSpacing));
       const { minClearance } = checkCollisions(
-        computeOBB(lerpPose(a, b, t), halfExtents), collisionQuads,
+        computeOBBFromPose(lerpPose(a, b, t), halfExtents), collisionQuads,
       );
       clearances.push(minClearance);
     }
@@ -252,7 +238,7 @@ export const saPlanner = {
     const fits = bestSegData.every(s => s.collEnergy === 0);
     let tightestIndex = 0, minC = Infinity;
     for (let i = 0; i < bestPoses.length; i++) {
-      const { minClearance } = checkCollisions(computeOBB(bestPoses[i], halfExtents), collisionQuads);
+      const { minClearance } = checkCollisions(computeOBBFromPose(bestPoses[i], halfExtents), collisionQuads);
       if (minClearance < minC) { minC = minClearance; tightestIndex = i; }
     }
 

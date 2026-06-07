@@ -42,3 +42,18 @@ export function applyRotationPropagation(poses, startIdx, endIdx, dof, delta) {
     j >= startIdx && j < endIdx ? { ...p, [dof]: p[dof] + delta } : { ...p }
   );
 }
+
+export function computeOBBFromPose({ x, y, z, yaw, pitch, roll }, halfExtents) {
+  const cy = Math.cos(yaw),   sy = Math.sin(yaw);
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const cr = Math.cos(roll),  sr = Math.sin(roll);
+  return {
+    center: [x, y, z],
+    axes: [
+      [ cy*cr + sy*sp*sr,  cp*sr, -sy*cr + cy*sp*sr ],
+      [-cy*sr + sy*sp*cr,  cp*cr,  sy*sr + cy*sp*cr ],
+      [ sy*cp,            -sp,     cy*cp             ],
+    ],
+    halfExtents,
+  };
+}
