@@ -3,6 +3,7 @@ import {
   euclideanDelta, angularDelta, segmentDuration, lerpPose, applyRotationPropagation,
   computeOBBFromPose,
 } from '../utils.js';
+import { findGatewayConfigs, bestGatewayConfig } from '../gateway.js';
 
 export const DEFAULT_WEIGHTS = {
   w_col: 100, w_clr: 1.5, w_rot: 0.45, w_pos: 0.45, w_time: 0.5, w_void: 150, w_nk: 2,
@@ -90,7 +91,10 @@ function totalEnergy(segData, poses, w) {
 
 export const saPlanner = {
   async plan(context, config, onProgress, shouldCancel) {
-    const { collisionQuads, halfExtents, startPose, endPose, containmentOBBs, centerline } = context;
+    const {
+      collisionQuads, halfExtents, startPose, endPose, containmentOBBs, centerline,
+      quadsBySegment, boundaries, stairZone,
+    } = context;
     const w        = { ...DEFAULT_WEIGHTS, ...(config ?? {}) };
     const MAX_ITER = config?.maxIter ?? 50000;
     const obbs     = containmentOBBs ?? [];
@@ -102,10 +106,23 @@ export const saPlanner = {
     function poseAt(pt) {
       return { x: pt[0], y: pt[1] + halfCeil, z: pt[2], yaw: 0, pitch: 0, roll: 0 };
     }
-    const stairBasePose = poseAt(points[Math.min(1, n - 1)]);
-    const stairMidPt    = points[Math.floor(n / 2)];
-    const midPose       = poseAt(stairMidPt);
-    const stairTopPose  = poseAt(points[Math.max(n - 2, 0)]);
+    let stairBasePose, stairTopPose;
+    if (quadsBySegment && boundaries) {
+      stairBasePose = bestGatewayConfig(findGatewayConfigs(
+        boundaries.bottomTransitionPt, ceilingHeight,
+        quadsBySegment['bottom-hall'], quadsBySegment.stair, halfExtents,
+      )) ?? poseAt(points[Math.min(1, n - 1)]);
+
+      stairTopPose = bestGatewayConfig(findGatewayConfigs(
+        boundaries.topTransitionPt, ceilingHeight,
+        quadsBySegment.stair, quadsBySegment['top-hall'], halfExtents,
+      )) ?? poseAt(points[Math.max(n - 2, 0)]);
+    } else {
+      stairBasePose = poseAt(points[Math.min(1, n - 1)]);
+      stairTopPose  = poseAt(points[Math.max(n - 2, 0)]);
+    }
+    const stairMidPt = points[Math.floor(n / 2)];
+    const midPose    = poseAt(stairMidPt);
 
     let bxMin = Infinity, bxMax = -Infinity;
     let byMin = Infinity, byMax = -Infinity;
@@ -184,26 +201,48 @@ export const saPlanner = {
         newEnergy = totalEnergy(newSegData, newPoses, w);
 
       } else if (r < 0.90 || poses.length <= 2) {
-        let worstIdx = 0;
-        for (let i = 1; i < segData.length; i++) {
-          const ci = segData[i].collEnergy, c0 = segData[worstIdx].collEnergy;
-          if (ci > c0 || (ci === c0 && segData[i].duration > segData[worstIdx].duration)) worstIdx = i;
+        const zone = stairZone ?? { zMin: -Infinity, zMax: Infinity };
+
+        // Only insert waypoints within the stair zone; skip hallway segments
+        let worstIdx = -1;
+        for (let i = 0; i < segData.length; i++) {
+          const midZ = (poses[i].z + poses[i + 1].z) / 2;
+          if (midZ < zone.zMin || midZ > zone.zMax) continue;
+          if (worstIdx === -1 ||
+              segData[i].collEnergy > segData[worstIdx].collEnergy ||
+             (segData[i].collEnergy === segData[worstIdx].collEnergy &&
+              segData[i].duration > segData[worstIdx].duration)) {
+            worstIdx = i;
+          }
         }
-        let mid = lerpPose(poses[worstIdx], poses[worstIdx + 1], 0.5);
-        for (const dof of DOFS) mid[dof] += randn() * SIGMA[dof] * T * 0.5;
-        mid = clampPose(mid);
-        newPoses = [
-          ...poses.slice(0, worstIdx + 1),
-          mid,
-          ...poses.slice(worstIdx + 1),
-        ];
-        newSegData = [
-          ...segData.slice(0, worstIdx),
-          evalSegment(newPoses[worstIdx],     mid,                    collisionQuads, halfExtents, obbs),
-          evalSegment(mid,                    newPoses[worstIdx + 2], collisionQuads, halfExtents, obbs),
-          ...segData.slice(worstIdx + 1),
-        ];
-        newEnergy = totalEnergy(newSegData, newPoses, w);
+
+        if (worstIdx === -1) {
+          // No stair-zone segment is worst; fall back to single-DOF perturbation
+          const i   = 1 + Math.floor(Math.random() * (poses.length - 2));
+          const dof = DOFS[Math.floor(Math.random() * 6)];
+          newPoses    = poses.map(p => ({ ...p }));
+          newPoses[i] = clampPose({ ...poses[i], [dof]: poses[i][dof] + randn() * SIGMA[dof] * T });
+          newSegData   = segData.slice();
+          newSegData[i - 1] = evalSegment(newPoses[i - 1], newPoses[i],     collisionQuads, halfExtents, obbs);
+          newSegData[i]     = evalSegment(newPoses[i],     newPoses[i + 1], collisionQuads, halfExtents, obbs);
+          newEnergy = totalEnergy(newSegData, newPoses, w);
+        } else {
+          let mid = lerpPose(poses[worstIdx], poses[worstIdx + 1], 0.5);
+          for (const dof of DOFS) mid[dof] += randn() * SIGMA[dof] * T * 0.5;
+          mid = clampPose(mid);
+          newPoses = [
+            ...poses.slice(0, worstIdx + 1),
+            mid,
+            ...poses.slice(worstIdx + 1),
+          ];
+          newSegData = [
+            ...segData.slice(0, worstIdx),
+            evalSegment(newPoses[worstIdx],     mid,                    collisionQuads, halfExtents, obbs),
+            evalSegment(mid,                    newPoses[worstIdx + 2], collisionQuads, halfExtents, obbs),
+            ...segData.slice(worstIdx + 1),
+          ];
+          newEnergy = totalEnergy(newSegData, newPoses, w);
+        }
 
       } else {
         const i    = 1 + Math.floor(Math.random() * (poses.length - 2));

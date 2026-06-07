@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { saPlanner, evalSegment } from './sa.js';
+import { buildPlannerContext } from '../context.js';
+import { DEFAULTS, BOX_DEFAULTS } from '../../defaults.js';
 
 // ── Shared fixtures ────────────────────────────────────────────────────────
 
@@ -92,5 +94,19 @@ describe('saPlanner.plan', () => {
     );
     expect(result.poses.length).toBeGreaterThanOrEqual(2);
     expect(callCount).toBeLessThan(10);
+  });
+});
+
+describe('saPlanner gateway initialization', () => {
+  it('plan succeeds with a full planner context (quadsBySegment present)', async () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
+    const result = await saPlanner.plan(ctx, { maxIter: 200 }, null, null);
+    expect(Array.isArray(result.poses)).toBe(true);
+    expect(result.poses.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('plan still works when quadsBySegment is absent (backward compat)', async () => {
+    const result = await saPlanner.plan(openContext, { maxIter: 100 }, null, null);
+    expect(Array.isArray(result.poses)).toBe(true);
   });
 });
