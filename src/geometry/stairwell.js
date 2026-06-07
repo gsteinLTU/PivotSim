@@ -70,6 +70,7 @@ export function buildStairwell(params) {
     side: THREE.DoubleSide,
     transparent: true,
     opacity: 0.3,
+    depthWrite: false, // Prevent z-fighting with treads/risers
   });
 
   // Left wall
@@ -151,14 +152,15 @@ function addStairWall(group, quads, material, opts) {
     const y1 = (i + 1) * risePerStep;
     const z0 = i * runPerStep;
     const z1 = (i + 1) * runPerStep;
-    const top = y1 + wallHeight;
+    const top0 = y0 + wallHeight;
+    const top1 = y1 + wallHeight;
 
     const geo = new THREE.BufferGeometry();
     const verts = new Float32Array([
       x, y0, z0,
       x, y1, z1,
-      x, top, z1,
-      x, top, z0,
+      x, top1, z1,
+      x, top0, z0,
     ]);
     geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
     geo.setIndex([0, 1, 2, 0, 2, 3]);
@@ -173,8 +175,8 @@ function addStairWall(group, quads, material, opts) {
       vertices: [
         [x, y0, z0],
         [x, y1, z1],
-        [x, top, z1],
-        [x, top, z0],
+        [x, top1, z1],
+        [x, top0, z0],
       ],
       normal: [normalX, 0, 0],
     });
@@ -206,10 +208,12 @@ function buildHallway(group, quads, params, position) {
 
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x99aa88, side: THREE.DoubleSide });
   const wallMat = new THREE.MeshStandardMaterial({
-    color: 0xccccdd, side: THREE.DoubleSide, transparent: true, opacity: 0.3,
+    color: 0xccccdd, side: THREE.DoubleSide, transparent: true, opacity: 0.3, 
+    depthWrite: false,
   });
   const ceilMat = new THREE.MeshStandardMaterial({
     color: 0xeeeeff, side: THREE.DoubleSide, transparent: true, opacity: 0.2,
+    depthWrite: false,
   });
 
   // Hallway extends in -Z direction (away from stairs) in local space
@@ -320,7 +324,7 @@ function buildHallway(group, quads, params, position) {
       [hallHalfW, ceilingHeight, -len],
       [-hallHalfW, ceilingHeight, -len],
     ],
-    normal: [0, 0, -1],
+    normal: [0, 0, 1],
   });
 
   // Second end cap (only when hallway is turned, fills gap where unrotated hallway meets stairwell)
@@ -340,7 +344,7 @@ function buildHallway(group, quads, params, position) {
         [hallHalfW, ceilingHeight, 0],
         [-hallHalfW, ceilingHeight, 0],
       ],
-      normal: [0, 0, 1],
+      normal: [0, 0, -1],
     });
   }
 
