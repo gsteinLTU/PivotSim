@@ -69,13 +69,12 @@ describe('buildPlannerContext', () => {
     expect(total).toBe(ctx.collisionQuads.length);
   });
 
-  it('returns stairZone with zMin, zMax, yMax', () => {
+  it('returns stairZone with zMin and zMax', () => {
     const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
     expect(typeof ctx.stairZone.zMin).toBe('number');
     expect(typeof ctx.stairZone.zMax).toBe('number');
-    expect(typeof ctx.stairZone.yMax).toBe('number');
+    expect(ctx.stairZone.zMin).toBe(0);
     expect(ctx.stairZone.zMax).toBeCloseTo(DEFAULTS.numSteps * DEFAULTS.runPerStep, 4);
-    expect(ctx.stairZone.yMax).toBeCloseTo(DEFAULTS.numSteps * DEFAULTS.risePerStep, 4);
   });
 
   it('returns boundaries with transition points', () => {

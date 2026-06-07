@@ -29,7 +29,6 @@ export function buildPlannerContext(stairwellParams, boxDims) {
   const stairZone = {
     zMin: 0,  // stair base is always at z=0 in this coordinate system
     zMax: boundaries.topTransitionPt[2],
-    yMax: boundaries.topTransitionPt[1],
   };
 
   return {

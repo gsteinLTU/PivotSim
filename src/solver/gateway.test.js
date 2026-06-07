@@ -71,6 +71,13 @@ describe('bestGatewayConfig', () => {
     expect(best.pitch).toBeCloseTo(0.1, 5);
   });
 
+  it('treats yaw near 2π as near-neutral (yaw wrap)', () => {
+    const nearNeutral = { x: 0, y: 1, z: 0, yaw: 2 * Math.PI - 0.1, pitch: 0, roll: 0 };
+    const halfWay     = { x: 0, y: 1, z: 0, yaw: Math.PI,            pitch: 0, roll: 0 };
+    const best = bestGatewayConfig([halfWay, nearNeutral]);
+    expect(best).toBe(nearNeutral);
+  });
+
   it('returns the single config when array has one element', () => {
     const c = { x: 0, y: 1, z: 0, yaw: 0.5, pitch: 0.3, roll: 0.1 };
     expect(bestGatewayConfig([c])).toBe(c);
