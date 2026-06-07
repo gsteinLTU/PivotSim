@@ -16,6 +16,7 @@ const ROLL_STEPS  = 7;   // ~30° increments, −90° to +90°
 export function findGatewayConfigs(transitionPt, ceilingHeight, quadsA, quadsB, halfExtents) {
   const [tx, ty, tz] = transitionPt;
   const allQuads = [...quadsA, ...quadsB];
+  if (allQuads.length === 0) return [];
   const y = ty + ceilingHeight / 2;
   const valid = [];
 
@@ -43,8 +44,10 @@ export function findGatewayConfigs(transitionPt, ceilingHeight, quadsA, quadsB, 
 export function bestGatewayConfig(configs) {
   if (configs.length === 0) return null;
   return configs.reduce((best, c) => {
-    const score = c.pitch * c.pitch + c.roll * c.roll + c.yaw * c.yaw;
-    const bscore = best.pitch * best.pitch + best.roll * best.roll + best.yaw * best.yaw;
+    const yw = c.yaw > Math.PI ? c.yaw - 2 * Math.PI : c.yaw;
+    const byw = best.yaw > Math.PI ? best.yaw - 2 * Math.PI : best.yaw;
+    const score = yw * yw + c.pitch * c.pitch + c.roll * c.roll;
+    const bscore = byw * byw + best.pitch * best.pitch + best.roll * best.roll;
     return score < bscore ? c : best;
   });
 }
