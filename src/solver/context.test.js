@@ -75,6 +75,7 @@ describe('buildPlannerContext', () => {
     expect(typeof ctx.stairZone.zMax).toBe('number');
     expect(typeof ctx.stairZone.yMax).toBe('number');
     expect(ctx.stairZone.zMax).toBeCloseTo(DEFAULTS.numSteps * DEFAULTS.runPerStep, 4);
+    expect(ctx.stairZone.yMax).toBeCloseTo(DEFAULTS.numSteps * DEFAULTS.risePerStep, 4);
   });
 
   it('returns boundaries with transition points', () => {
