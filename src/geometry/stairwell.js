@@ -30,6 +30,7 @@ export function buildStairwell(params) {
 
     collisionQuads.push({
       type: 'tread',
+      segment: 'stair',
       vertices: [
         [-halfW, y, z],
         [halfW, y, z],
@@ -47,6 +48,7 @@ export function buildStairwell(params) {
 
     collisionQuads.push({
       type: 'riser',
+      segment: 'stair',
       vertices: [
         [-halfW, y - risePerStep, z],
         [halfW, y - risePerStep, z],
@@ -119,6 +121,7 @@ export function buildStairwell(params) {
 
     collisionQuads.push({
       type: 'ceiling',
+      segment: 'stair',
       vertices: [
         [-halfW, ceilY0, 0],
         [halfW, ceilY0, 0],
@@ -165,6 +168,7 @@ function addStairWall(group, quads, material, opts) {
 
     quads.push({
       type,
+      segment: 'stair',
       vertices: [
         [x, y0, z0],
         [x, y1, z1],
@@ -193,6 +197,8 @@ function buildHallway(group, quads, params, position) {
   const hallHalfW = hallwayWidth / 2;
   const stairHalfW = stairWidth / 2;
 
+  const segment = position === 'bottom' ? 'bottom-hall' : 'top-hall';
+
   // Create a sub-group for the hallway, then rotate it into position
   const hallGroup = new THREE.Group();
   const hallQuads = [];
@@ -217,6 +223,7 @@ function buildHallway(group, quads, params, position) {
 
   hallQuads.push({
     type: 'floor',
+    segment,
     vertices: [
       [-hallHalfW, 0, 0],
       [hallHalfW, 0, 0],
@@ -241,6 +248,7 @@ function buildHallway(group, quads, params, position) {
 
   hallQuads.push({
     type: 'wall-left',
+    segment,
     vertices: [
       [-hallHalfW, 0, leftStartZ],
       [-hallHalfW, 0, -len],
@@ -265,6 +273,7 @@ function buildHallway(group, quads, params, position) {
 
   hallQuads.push({
     type: 'wall-right',
+    segment,
     vertices: [
       [hallHalfW, 0, rightStartZ],
       [hallHalfW, 0, -len],
@@ -284,6 +293,7 @@ function buildHallway(group, quads, params, position) {
 
   hallQuads.push({
     type: 'ceiling',
+    segment,
     vertices: [
       [-hallHalfW, ceilingHeight, 0],
       [hallHalfW, ceilingHeight, 0],
@@ -302,6 +312,7 @@ function buildHallway(group, quads, params, position) {
   
   hallQuads.push({
     type: 'wall-end',
+    segment,
     vertices: [
       [-hallHalfW, 0, -len],
       [hallHalfW, 0, -len],
@@ -321,6 +332,7 @@ function buildHallway(group, quads, params, position) {
 
     hallQuads.push({
       type: 'wall-end',
+      segment,
       vertices: [
         [-hallHalfW, 0, 0],
         [hallHalfW, 0, 0],
@@ -371,6 +383,7 @@ function buildHallway(group, quads, params, position) {
 
     quads.push({
       type: quad.type,
+      segment: quad.segment,
       vertices: transformed,
       normal: [nVec.x, nVec.y, nVec.z],
     });

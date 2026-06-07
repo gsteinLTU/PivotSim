@@ -189,4 +189,25 @@ describe('buildStairwell', () => {
     const endCaps = result.collisionQuads.filter((q) => q.type === 'wall-end');
     expect(endCaps.length).toBe(2);
   });
+
+  it('tags every collision quad with a segment field', () => {
+    const { collisionQuads } = buildStairwell(DEFAULTS);
+    const valid = new Set(['stair', 'bottom-hall', 'top-hall']);
+    for (const quad of collisionQuads) {
+      expect(valid.has(quad.segment), `type=${quad.type} segment=${quad.segment}`).toBe(true);
+    }
+  });
+
+  it('stair segment contains all treads and risers', () => {
+    const { collisionQuads } = buildStairwell(DEFAULTS);
+    const stair = collisionQuads.filter(q => q.segment === 'stair');
+    expect(stair.some(q => q.type === 'tread')).toBe(true);
+    expect(stair.some(q => q.type === 'riser')).toBe(true);
+  });
+
+  it('bottom-hall and top-hall each contain a floor quad', () => {
+    const { collisionQuads } = buildStairwell(DEFAULTS);
+    expect(collisionQuads.some(q => q.segment === 'bottom-hall' && q.type === 'floor')).toBe(true);
+    expect(collisionQuads.some(q => q.segment === 'top-hall' && q.type === 'floor')).toBe(true);
+  });
 });
