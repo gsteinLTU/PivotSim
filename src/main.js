@@ -1,3 +1,20 @@
+const _probe = document.createElement('canvas');
+if (!(_probe.getContext('webgl2') || _probe.getContext('webgl'))) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a1a;color:#e0e0e0;font-family:system-ui,sans-serif;gap:16px;z-index:9999;';
+  overlay.innerHTML = `
+    <h1 style="font-family:monospace;font-size:22px;color:#ff4444;margin:0;">WebGL Not Available</h1>
+    <p style="font-size:15px;margin:0;">PivotSim requires WebGL to render the 3D view.</p>
+    <ul style="font-size:14px;color:#aaa;line-height:1.8;margin:0;padding-left:20px;">
+      <li>Enable hardware acceleration in your browser settings</li>
+      <li>Try Chrome, Firefox, or Edge</li>
+      <li>Update your GPU drivers</li>
+    </ul>
+  `;
+  document.body.appendChild(overlay);
+  throw new Error('WebGL not available');
+}
+
 import * as THREE from 'three';
 import { createScene } from './viewer/scene.js';
 import { createConfigPanel } from './ui/config-panel.js';
