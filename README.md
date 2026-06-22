@@ -21,4 +21,4 @@ npm test          # run all tests
 npm run build     # production build → dist/
 ```
 
-Built with [Vite](https://vite.dev), [Three.js](https://threejs.org), and [Vitest](https://vitest.dev). No TypeScript.
+Built with [Vite](https://vite.dev), [Three.js](https://threejs.org), and [Vitest](https://vitest.dev).
