@@ -112,4 +112,20 @@ describe('buildPlannerContext', () => {
     const ctx = buildPlannerContext(straight, BOX_DEFAULTS);
     expect(ctx.startPose.yaw).toBeCloseTo(0, 5);
   });
+
+  it('endPoses is empty when goalYawOffsets is empty', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS, []);
+    expect(ctx.endPoses).toHaveLength(0);
+  });
+
+  it('endPose fallback is corridor-aligned when endPoses is empty', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS, []);
+    expect(ctx.endPoses).toHaveLength(0);
+    for (const k of ['x', 'y', 'z', 'yaw', 'pitch', 'roll']) {
+      expect(typeof ctx.endPose[k]).toBe('number');
+      expect(Number.isFinite(ctx.endPose[k])).toBe(true);
+    }
+    expect(ctx.endPose.pitch).toBe(0);
+    expect(ctx.endPose.roll).toBe(0);
+  });
 });
