@@ -61,8 +61,10 @@ function validEdge(a, b, quads, halfExtents, cfg) {
 
 // ── Tree operations ────────────────────────────────────────────────────────
 
-function newTree(rootPose) {
-  return { nodes: [{ pose: { ...rootPose }, parent: -1 }] };
+function newTree(rootPoses) {
+  const roots = Array.isArray(rootPoses) ? rootPoses : [rootPoses];
+  const nodes = roots.map(pose => ({ pose: { ...pose }, parent: -1 }));
+  return { nodes };
 }
 
 function addNode(tree, pose, parentIdx) {
@@ -247,7 +249,7 @@ function subsample(poses, maxN) {
 export const rrtPlanner = {
   async plan(context, config, onProgress, shouldCancel) {
     const {
-      collisionQuads, halfExtents, startPose, endPose,
+      collisionQuads, halfExtents, startPose, endPose, endPoses = [],
       containmentOBBs, quadsBySegment, boundaries, centerline,
     } = context;
     const cfg = { ...DEFAULTS, ...(config ?? {}) };
@@ -259,9 +261,8 @@ export const rrtPlanner = {
       return { poses: path, fits: false, tightestIndex };
     }
 
-    // Abort early if start or goal is already in collision
-    if (!validState(startPose, collisionQuads, halfExtents) ||
-        !validState(endPose,   collisionQuads, halfExtents)) {
+    // Abort early if start is in collision or there are no goal poses
+    if (!validState(startPose, collisionQuads, halfExtents) || endPoses.length === 0) {
       return fallback();
     }
 
@@ -285,7 +286,7 @@ export const rrtPlanner = {
 
     // Two trees: start and goal. We alternate which is active (Ta/Tb) each iter.
     const treeStart = newTree(startPose);
-    const treeGoal  = newTree(endPose);
+    const treeGoal  = newTree(endPoses);
     let Ta = treeStart, Tb = treeGoal;
     let startIsA = true;  // is treeStart currently Ta?
     let connection = null; // { aIdx: index in treeStart, bIdx: index in treeGoal }
