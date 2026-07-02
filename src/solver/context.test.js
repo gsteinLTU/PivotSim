@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { buildPlannerContext } from './context.js';
 import { DEFAULTS, BOX_DEFAULTS } from '../defaults.js';
+import { checkCollisions } from './collision.js';
+import { computeOBBFromPose } from './utils.js';
 
 describe('buildPlannerContext', () => {
   it('returns all required fields', () => {
@@ -13,6 +15,7 @@ describe('buildPlannerContext', () => {
     expect(ctx.centerline).toBeDefined();
     expect(ctx.startPose).toBeDefined();
     expect(ctx.endPose).toBeDefined();
+    expect(Array.isArray(ctx.endPoses)).toBe(true);
   });
 
   it('startPose and endPose are valid 6-DOF poses', () => {
@@ -73,5 +76,40 @@ describe('buildPlannerContext', () => {
     const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
     expect(Array.isArray(ctx.boundaries.bottomTransitionPt)).toBe(true);
     expect(Array.isArray(ctx.boundaries.topTransitionPt)).toBe(true);
+  });
+
+  it('endPoses contains only collision-free poses', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
+    for (const pose of ctx.endPoses) {
+      const { minClearance } = checkCollisions(
+        computeOBBFromPose(pose, ctx.halfExtents),
+        ctx.collisionQuads,
+      );
+      expect(minClearance).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('endPoses has at most goalYawOffsets.length entries', () => {
+    const offsets = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS, offsets);
+    expect(ctx.endPoses.length).toBeLessThanOrEqual(offsets.length);
+  });
+
+  it('endPose alias equals endPoses[0] when endPoses is non-empty', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS);
+    if (ctx.endPoses.length > 0) {
+      expect(ctx.endPose).toEqual(ctx.endPoses[0]);
+    }
+  });
+
+  it('accepts custom goalYawOffsets', () => {
+    const ctx = buildPlannerContext(DEFAULTS, BOX_DEFAULTS, [0]);
+    expect(ctx.endPoses.length).toBeLessThanOrEqual(1);
+  });
+
+  it('startPose yaw is corridor-aligned (0 for straight stairwell)', () => {
+    const straight = { ...DEFAULTS, bottomHallwayTurn: 0, topHallwayTurn: 0 };
+    const ctx = buildPlannerContext(straight, BOX_DEFAULTS);
+    expect(ctx.startPose.yaw).toBeCloseTo(0, 5);
   });
 });
