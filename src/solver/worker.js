@@ -14,7 +14,7 @@ self.onmessage = async ({ data }) => {
     try {
       const planner = PLANNERS[plannerType];
       if (!planner) throw new Error(`Unknown planner: ${plannerType}`);
-      const context = buildPlannerContext(stairwellParams, boxDims);
+      const context = buildPlannerContext(stairwellParams, boxDims, plannerConfig?.goalYawOffsets);
       const result  = await planner.plan(
         context, plannerConfig,
         (d) => self.postMessage({ type: 'progress', plannerType, ...d }),
