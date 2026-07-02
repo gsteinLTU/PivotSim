@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCenterline, getEndpoints, buildContainmentOBBs, getSegmentBoundaries } from './path.js';
+import { buildCenterline, getEndpoints, buildContainmentOBBs, getSegmentBoundaries, getCorridorYaws } from './path.js';
 import { DEFAULTS } from '../defaults.js';
 
 describe('buildCenterline', () => {
@@ -130,5 +130,31 @@ describe('getSegmentBoundaries', () => {
     const totalRun  = DEFAULTS.numSteps * DEFAULTS.runPerStep;
     expect(topTransitionPt[1]).toBeCloseTo(totalRise, 4);
     expect(topTransitionPt[2]).toBeCloseTo(totalRun, 4);
+  });
+});
+
+describe('getCorridorYaws', () => {
+  it('returns finite numbers for startYaw and endYaw', () => {
+    const cl = buildCenterline(DEFAULTS);
+    const { startYaw, endYaw } = getCorridorYaws(cl);
+    expect(Number.isFinite(startYaw)).toBe(true);
+    expect(Number.isFinite(endYaw)).toBe(true);
+  });
+
+  it('returns 0 for both yaws on a straight stairwell (no turns)', () => {
+    const straight = { ...DEFAULTS, bottomHallwayTurn: 0, topHallwayTurn: 0 };
+    const cl = buildCenterline(straight);
+    const { startYaw, endYaw } = getCorridorYaws(cl);
+    expect(startYaw).toBeCloseTo(0, 5);
+    expect(endYaw).toBeCloseTo(0, 5);
+  });
+
+  it('startYaw and endYaw are in [-π, π]', () => {
+    const cl = buildCenterline(DEFAULTS);
+    const { startYaw, endYaw } = getCorridorYaws(cl);
+    expect(startYaw).toBeGreaterThanOrEqual(-Math.PI);
+    expect(startYaw).toBeLessThanOrEqual(Math.PI);
+    expect(endYaw).toBeGreaterThanOrEqual(-Math.PI);
+    expect(endYaw).toBeLessThanOrEqual(Math.PI);
   });
 });

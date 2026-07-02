@@ -163,3 +163,23 @@ export function getSegmentBoundaries(centerline) {
     topTransitionPt:     points[n - 2],
   };
 }
+
+/**
+ * Returns the natural yaw angles aligned with each hallway's corridor direction.
+ * startYaw: angle of the vector from bottomFarEnd toward stairBase (box enters the stairs).
+ * endYaw:   angle of the vector from stairTop toward topFarEnd (box exits the stairs).
+ * Both return 0 for straight staircases, preserving previous default behavior.
+ */
+export function getCorridorYaws(centerline) {
+  const { points } = centerline;
+  const n = points.length;
+  const startYaw = Math.atan2(
+    points[1][0] - points[0][0],
+    points[1][2] - points[0][2],
+  );
+  const endYaw = Math.atan2(
+    points[n - 1][0] - points[n - 2][0],
+    points[n - 1][2] - points[n - 2][2],
+  );
+  return { startYaw, endYaw };
+}
