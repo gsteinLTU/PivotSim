@@ -8,7 +8,8 @@
 The planner currently hardcodes `yaw: 0` for both `startPose` and `endPose` in `context.js`. This has two failure modes:
 
 1. **Turned hallways:** A box approaching or leaving a turned hallway at `yaw: 0` is misaligned with the corridor direction, so the planner wastes budget fighting a bad start/end orientation.
-2. **Large objects:** A box that physically fits through the stairwell may only be able to arrive at the top rotated 180° from `yaw: 0`. The planner never finds a path despite a valid solution existing.
+2. **Large objects (180°):** A box that physically fits through the stairwell may only be able to arrive at the top rotated 180° from `yaw: 0`. The planner never finds a path despite a valid solution existing.
+3. **Wide objects in straight hallways (90°):** Even with no turn, a wide box may only fit in the hallway broadside — requiring a 90° or −90° arrival yaw. Since `[0, π]` are the only candidates tried, these cases also fail despite a valid solution existing.
 
 ## Solution
 
@@ -28,7 +29,7 @@ Add `getCorridorYaws(centerline)` to `path.js`. It returns `{ startYaw, endYaw }
 
 For a straight staircase (no turn) both are `0`, preserving current behavior.
 
-`buildPlannerContext` uses `startYaw` for `startPose` (single pose, entry orientation is fixed) and `endYaw` as the base for candidate goal poses.
+`buildPlannerContext` uses `startYaw` for `startPose` (single pose, entry orientation is fixed) and `endYaw` as the base for candidate goal poses. The default `goalYawOffsets` is `[0, π/2, π, -π/2]` — all four cardinal orientations relative to the corridor direction.
 
 ### 2. Multi-root goal tree (`rrt-connect.js`)
 
@@ -48,7 +49,7 @@ const treeGoal = newTree(context.endPoses);
 
 ### 3. Context API (`context.js`)
 
-`buildPlannerContext` replaces the single `endPose` return value with an `endPoses` array. It gains an optional third argument `goalYawOffsets` (default `[0, Math.PI]`), passed in from the worker alongside the box dimensions and stairwell params.
+`buildPlannerContext` replaces the single `endPose` return value with an `endPoses` array. It gains an optional third argument `goalYawOffsets` (default `[0, Math.PI/2, Math.PI, -Math.PI/2]`), passed in from the worker alongside the box dimensions and stairwell params.
 
 **Computing candidates:** For each offset in `goalYawOffsets`, construct a candidate pose at `{endPosition, yaw: endYaw + offset, pitch: 0, roll: 0}`.
 

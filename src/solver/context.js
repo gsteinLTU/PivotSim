@@ -14,16 +14,15 @@ export function buildPlannerContext(stairwellParams, boxDims, goalYawOffsets = D
   const boundaries         = getSegmentBoundaries(centerline);
   const { startYaw, endYaw } = getCorridorYaws(centerline);
 
-  const { points, ceilingHeight } = centerline;
+  const { ceilingHeight, startHallCenter, endHallCenter } = centerline;
   const halfCeil = ceilingHeight / 2;
-  const n = points.length;
-  function midpoint(a, b) {
-    return [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2];
-  }
-  const startPt = midpoint(points[0], points[1]);
-  const endPt   = midpoint(points[n - 1], points[n - 2]);
+  const startPt  = startHallCenter;
+  const endPt    = endHallCenter;
 
-  const startPose = { x: startPt[0], y: startPt[1] + halfCeil, z: startPt[2], yaw: startYaw, pitch: 0, roll: 0 };
+  const startPoseCandidate = { x: startPt[0], y: startPt[1] + halfCeil, z: startPt[2], yaw: startYaw, pitch: 0, roll: 0 };
+  const startPose = checkCollisions(computeOBBFromPose(startPoseCandidate, halfExtents), collisionQuads).minClearance >= 0
+    ? startPoseCandidate
+    : { x: startPt[0], y: startPt[1] + halfCeil, z: startPt[2], yaw: 0, pitch: 0, roll: 0 };
 
   const endPosition = { x: endPt[0], y: endPt[1] + halfCeil, z: endPt[2] };
   const endPoses = goalYawOffsets

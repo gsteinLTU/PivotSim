@@ -291,7 +291,7 @@ const timeline = createTimeline(timelineContainer, {
   onPlayheadChange: (seconds) => { isPlaying = false; timeline.setPlayState(false); onPlayheadChange(seconds); },
   onPlayToggle:    (playing)  => { isPlaying = playing; },
   onSpeedChange:   (speed)    => { playSpeed = speed; },
-  onReset:         ()         => { currentTrajectory = null; isPlaying = false; clearGhostTrail(); },
+  onReset:         ()         => { currentTrajectory = null; isPlaying = false; clearGhostTrail(); if (currentBox) updateBoxMeshPose(currentBox, poseRad(currentBoxPose)); },
 });
 
 // ── Initial build ──────────────────────────────────────────────────────────

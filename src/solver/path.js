@@ -79,7 +79,20 @@ export function buildCenterline(params) {
     totalLength += Math.sqrt((x1-x0)**2 + (y1-y0)**2 + (z1-z0)**2);
   }
 
-  return { points, totalLength, ceilingHeight };
+  // Physical hallway centers — on the true corridor axis, not the distorted
+  // segment midpoints.  For straight hallways these equal the segment midpoints.
+  const startHallCenter = [
+    btXOff + (L / 2) * Math.sin(btRad),
+    0,
+    btZOff - (L / 2) * Math.cos(btRad),
+  ];
+  const endHallCenter = [
+    ttXOff + (L / 2) * (-Math.sin(ttRad)),
+    totalRise,
+    totalRun + ttZOff + (L / 2) * Math.cos(ttRad),
+  ];
+
+  return { points, totalLength, ceilingHeight, startHallCenter, endHallCenter };
 }
 
 /**
